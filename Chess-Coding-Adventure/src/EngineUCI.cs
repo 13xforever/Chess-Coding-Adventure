@@ -4,6 +4,7 @@ using System.IO;
 
 namespace CodingAdventureBot;
 
+// Specification download: https://www.shredderchess.com/download.html
 public class EngineUCI
 {
 	private readonly Bot engine;
@@ -27,6 +28,9 @@ public class EngineUCI
 		switch (messageType)
 		{
 			case "uci":
+				Respond("id name Coding Adventure 2.0");
+				Respond("id author Sebastian Lague");
+				Respond("option name UCI_EngineAbout type string default Chess Coding Adventure Bot by Sebastian Lague. See https://github.com/SebLague/Chess-Coding-Adventure for details.");
 				Respond("uciok");
 				break;
 			case "isready":
