@@ -16,8 +16,8 @@ Description of the universal chess interface (UCI)    April  2006
 
 * all command strings the engine receives will end with `\n`,
   also all commands the GUI receives should end with `\n`.
-  > [!Note]
-  > `\n` can be `0x0d` or `0x0a0d` or any combination depending on your OS.
+  > ℹ️ Note  
+  > `\n` can be `0x0d` or `0x0a0d` or any combination depending on your OS.  
   > If you use Engine and GUI in the same OS this should be no problem if you communicate in text mode,
   > but be aware of this when for example running a Linux engine in a Windows GUI.
 
@@ -133,8 +133,8 @@ These are all the command the engine gets from the interface.
 	set up the position described in `fenstring` on the internal board and
 	play the moves on the internal chess board.  
 	If the game was played  from the start position the string `startpos` will be sent.  
-	> [!Note]
-	> no `new` command is needed. However, if this position is from a different game than
+	> ℹ️ Note  
+	> No `new` command is needed. However, if this position is from a different game than
 	> the last position sent to the engine, the GUI should have sent an `ucinewgame` in-between.
 
 * `go`  
@@ -324,14 +324,14 @@ Engine to GUI
 	This should be sent once at engine startup after the `uci` and the `id` commands
 	if any parameter can be changed in the engine.  
 	The GUI should parse this and build a dialog for the user to change the settings.  
-	> [!Note]
-	> not every option needs to appear in this dialog as some options like
+	> ℹ️ Note  
+	> Not every option needs to appear in this dialog as some options like
 	> `Ponder`, `UCI_AnalyseMode`, etc. are better handled elsewhere or are set automatically.
 
 	If the user wants to change some settings, the GUI will send a `setoption` command to the engine.  
-	> [!Note]
-	> the GUI need not send the `setoption` command when starting the engine for every option if
-	it doesn't want to change the default value.
+	> ℹ️ Note  
+	> The GUI need not send the `setoption` command when starting the engine for every option if
+	> it doesn't want to change the default value.
 
 	For all allowed combinations see the examples below,
 	as some combinations of this token don't make sense.  
@@ -362,7 +362,7 @@ Engine to GUI
 		* `<id>` = `Ponder`, type check  
 			this means that the engine is able to ponder.  
 			The GUI will send this whenever pondering is possible or not.
-			> [!Note]
+			> ℹ️ Note  
 			> The engine should not start pondering on its own if this is enabled, this option is only
 			> needed because the engine might change its time management algorithm when pondering is allowed.
 		* `<id>` = `OwnBook`, type check  
@@ -462,7 +462,7 @@ This is how the communication when the engine boots can look like:
 | the engine can switch off Nullmove and set the playing style<br/><pre>option name Nullmove type check default true<br/>option name Style type combo default Normal var Solid var Normal var Risky</pre> |
 |                                                                                                                                                                                                         | the engine has sent all parameters and is ready<br/><pre>uciok</pre>                                                                                                             |
 > [!Note]
-> here the GUI can already send a `quit` command if it just wants to find out
+> Here the GUI can already send a `quit` command if it just wants to find out
 > details about the engine, so the engine should not initialize its internal
 > parameters before here.
 
