@@ -13,7 +13,7 @@ public static class PrecomputedMoveData
 	// First 4 are orthogonal, last 4 are diagonals (N, S, W, E, NW, SE, NE, SW)
 	public static readonly int[] directionOffsets = [8, -8, -1, 1, 7, -7, 9, -9];
 
-	static readonly Coord[] dirOffsets2D =
+	private static readonly Coord[] dirOffsets2D =
 	[
 		new(0, 1),
 		new(0, -1),

@@ -130,7 +130,7 @@ public static class PieceSquareTable
 		Tables[Piece.MakePiece(Piece.Queen, Piece.Black)] = GetFlippedTable(Queens);
 	}
 
-	static int[] GetFlippedTable(int[] table)
+	private static int[] GetFlippedTable(int[] table)
 	{
 		var flippedTable = new int[table.Length];
 

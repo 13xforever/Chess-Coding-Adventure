@@ -76,7 +76,7 @@ public static class Zobrist
 		return zobristKey;
 	}
 
-	static ulong RandomUnsigned64BitNumber(System.Random rng)
+	private static ulong RandomUnsigned64BitNumber(System.Random rng)
 	{
 		var buffer = new byte[8];
 		rng.NextBytes(buffer);

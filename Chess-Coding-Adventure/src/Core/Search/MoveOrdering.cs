@@ -2,27 +2,26 @@
 
 public class MoveOrdering
 {
+	private int[] moveScores;
+	private const int maxMoveCount = 218;
 
-	int[] moveScores;
-	const int maxMoveCount = 218;
+	private const int squareControlledByOpponentPawnPenalty = 350;
+	private const int capturedPieceValueMultiplier = 100;
 
-	const int squareControlledByOpponentPawnPenalty = 350;
-	const int capturedPieceValueMultiplier = 100;
-
-	TranspositionTable transpositionTable;
-	Move invalidMove;
+	private TranspositionTable transpositionTable;
+	private Move invalidMove;
 
 	public Killers[] killerMoves;
 	public int[,,] History;
 	public const int maxKillerMovePly = 32;
 
-	const int million = 1000000;
-	const int hashMoveScore = 100 * million;
-	const int winningCaptureBias = 8 * million;
-	const int promoteBias = 6 * million;
-	const int killerBias = 4 * million;
-	const int losingCaptureBias = 2 * million;
-	const int regularBias = 0;
+	private const int million = 1000000;
+	private const int hashMoveScore = 100 * million;
+	private const int winningCaptureBias = 8 * million;
+	private const int promoteBias = 6 * million;
+	private const int killerBias = 4 * million;
+	private const int losingCaptureBias = 2 * million;
+	private const int regularBias = 0;
 
 	public MoveOrdering(MoveGenerator m, TranspositionTable tt)
 	{
@@ -138,7 +137,7 @@ public class MoveOrdering
 		Quicksort(moves, moveScores, 0, moves.Length - 1);
 	}
 
-	static int GetPieceValue(int pieceType)
+	private static int GetPieceValue(int pieceType)
 	{
 		switch (pieceType)
 		{
@@ -206,7 +205,7 @@ public class MoveOrdering
 		}
 	}
 
-	static int Partition(System.Span<Move> values, int[] scores, int low, int high)
+	private static int Partition(System.Span<Move> values, int[] scores, int low, int high)
 	{
 		var pivotScore = scores[high];
 		var i = low - 1;

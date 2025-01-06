@@ -18,7 +18,7 @@ public static class PrecomputedEvaluationData
 		}
 	}
 
-	static void CreatePawnShieldSquare(int squareIndex)
+	private static void CreatePawnShieldSquare(int squareIndex)
 	{
 		List<int> shieldIndicesWhite = new();
 		List<int> shieldIndicesBlack = new();

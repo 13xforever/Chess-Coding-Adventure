@@ -5,8 +5,8 @@ namespace Chess.Core;
 
 public class OpeningBook
 {
-	readonly Dictionary<string, BookMove[]> movesByPosition;
-	readonly Random rng;
+	private readonly Dictionary<string, BookMove[]> movesByPosition;
+	private readonly Random rng;
 
 	public OpeningBook(string file)
 	{
@@ -88,7 +88,7 @@ public class OpeningBook
 		int WeightedPlayCount(int playCount) => (int)Math.Ceiling(Math.Pow(playCount, weightPow));
 	}
 
-	string RemoveMoveCountersFromFEN(string fen)
+	private string RemoveMoveCountersFromFEN(string fen)
 	{
 		var fenA = fen[..fen.LastIndexOf(' ')];
 		return fenA[..fenA.LastIndexOf(' ')];

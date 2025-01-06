@@ -12,39 +12,40 @@ public class MoveGenerator
 	public PromotionMode promotionsToGenerate = PromotionMode.All;
 
 	// ---- Instance variables ----
-	bool isWhiteToMove;
-	int friendlyColour;
-	int opponentColour;
-	int friendlyKingSquare;
-	int friendlyIndex;
-	int enemyIndex;
+	private bool isWhiteToMove;
+	private int friendlyColour;
+	private int opponentColour;
+	private int friendlyKingSquare;
+	private int friendlyIndex;
+	private int enemyIndex;
 
-	bool inCheck;
-	bool inDoubleCheck;
+	private bool inCheck;
+	private bool inDoubleCheck;
 
 	// If in check, this bitboard contains squares in line from checking piece up to king
 	// If not in check, all bits are set to 1
-	ulong checkRayBitmask;
+	private ulong checkRayBitmask;
 
-	ulong pinRays;
-	ulong notPinRays;
-	ulong opponentAttackMapNoPawns;
+	private ulong pinRays;
+	private ulong notPinRays;
+	private ulong opponentAttackMapNoPawns;
 	public ulong opponentAttackMap;
 	public ulong opponentPawnAttackMap;
-	ulong opponentSlidingAttackMap;
+	private ulong opponentSlidingAttackMap;
 
-	bool generateQuietMoves;
-	Board board;
-	int currMoveIndex;
+	private bool generateQuietMoves;
+	private Board board;
+	private int currMoveIndex;
 
-	ulong enemyPieces;
-	ulong friendlyPieces;
-	ulong allPieces;
-	ulong emptySquares;
-	ulong emptyOrEnemySquares;
+	private ulong enemyPieces;
+	private ulong friendlyPieces;
+	private ulong allPieces;
+	private ulong emptySquares;
+
+	private ulong emptyOrEnemySquares;
 	// If only captures should be generated, this will have 1s only in positions of enemy pieces.
 	// Otherwise it will have 1s everywhere.
-	ulong moveTypeMask;
+	private ulong moveTypeMask;
 
 	public Span<Move> GenerateMoves(Board board, bool capturesOnly = false)
 	{
@@ -82,7 +83,7 @@ public class MoveGenerator
 		return inCheck;
 	}
 
-	void Init()
+	private void Init()
 	{
 		// Reset state
 		currMoveIndex = 0;
@@ -110,7 +111,7 @@ public class MoveGenerator
 		CalculateAttackData();
 	}
 
-	void GenerateKingMoves(Span<Move> moves)
+	private void GenerateKingMoves(Span<Move> moves)
 	{
 		var legalMask = ~(opponentAttackMap | friendlyPieces);
 		var kingMoves = BitBoardUtility.KingMoves[friendlyKingSquare] & legalMask & moveTypeMask;
@@ -146,7 +147,7 @@ public class MoveGenerator
 		}
 	}
 
-	void GenerateSlidingMoves(Span<Move> moves)
+	private void GenerateSlidingMoves(Span<Move> moves)
 	{
 		// Limit movement to empty or enemy squares, and must block check if king is in check.
 		var moveMask = emptyOrEnemySquares & checkRayBitmask & moveTypeMask;
@@ -201,7 +202,7 @@ public class MoveGenerator
 	}
 
 
-	void GenerateKnightMoves(Span<Move> moves)
+	private void GenerateKnightMoves(Span<Move> moves)
 	{
 		var friendlyKnightPiece = Piece.MakePiece(Piece.Knight, board.MoveColour);
 		// bitboard of all non-pinned knights
@@ -221,7 +222,7 @@ public class MoveGenerator
 		}
 	}
 
-	void GeneratePawnMoves(Span<Move> moves)
+	private void GeneratePawnMoves(Span<Move> moves)
 	{
 		var pushDir = board.IsWhiteToMove ? 1 : -1;
 		var pushOffset = pushDir * 8;
@@ -364,7 +365,7 @@ public class MoveGenerator
 		}
 	}
 
-	void GeneratePromotions(int startSquare, int targetSquare, Span<Move> moves)
+	private void GeneratePromotions(int startSquare, int targetSquare, Span<Move> moves)
 	{
 		moves[currMoveIndex++] = new(startSquare, targetSquare, Move.PromoteToQueenFlag);
 		// Don't generate non-queen promotions in q-search
@@ -383,12 +384,12 @@ public class MoveGenerator
 		}
 	}
 
-	bool IsPinned(int square)
+	private bool IsPinned(int square)
 	{
 		return ((pinRays >> square) & 1) != 0;
 	}
 
-	void GenSlidingAttackMap()
+	private void GenSlidingAttackMap()
 	{
 		opponentSlidingAttackMap = 0;
 
@@ -409,7 +410,7 @@ public class MoveGenerator
 		}
 	}
 
-	void CalculateAttackData()
+	private void CalculateAttackData()
 	{
 		GenSlidingAttackMap();
 		// Search squares in all directions around friendly king for checks/pins by enemy sliding pieces (queen, rook, bishop)
@@ -544,7 +545,7 @@ public class MoveGenerator
 	// Test if capturing a pawn with en-passant reveals a sliding piece attack against the king
 	// Note: this is only used for cases where pawn appears to not be pinned due to opponent pawn being on same rank
 	// (therefore only need to check orthogonal sliders)
-	bool InCheckAfterEnPassant(int startSquare, int targetSquare, int epCaptureSquare)
+	private bool InCheckAfterEnPassant(int startSquare, int targetSquare, int epCaptureSquare)
 	{
 		var enemyOrtho = board.EnemyOrthogonalSliders;
 

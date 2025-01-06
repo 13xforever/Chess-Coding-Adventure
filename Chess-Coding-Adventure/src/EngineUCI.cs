@@ -64,13 +64,13 @@ public class EngineUCI
 		}
 	}
 
-	void OnMoveChosen(string move)
+	private void OnMoveChosen(string move)
 	{
 		LogToFile("OnMoveChosen: book move = " + engine.LatestMoveIsBookMove);
 		Respond("bestmove " + move);
 	}
 
-	void ProcessGoCommand(string message)
+	private void ProcessGoCommand(string message)
 	{
 		if (message.Contains("movetime"))
 		{
@@ -94,7 +94,7 @@ public class EngineUCI
 	// Format: 'position startpos moves e2e4 e7e5'
 	// Or: 'position fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 moves e2e4 e7e5'
 	// Note: 'moves' section is optional
-	void ProcessPositionCommand(string message)
+	private void ProcessPositionCommand(string message)
 	{
 		// FEN
 		if (message.ToLower().Contains("startpos"))
@@ -124,13 +124,13 @@ public class EngineUCI
 		LogToFile($"Make moves after setting position: {moveList.Length}");
 	}
 
-	void Respond(string reponse)
+	internal static void Respond(string reponse)
 	{
 		Console.WriteLine(reponse);
 		LogToFile("Response sent: " + reponse);
 	}
 
-	static int TryGetLabelledValueInt(string text, string label, string[] allLabels, int defaultValue = 0)
+	private static int TryGetLabelledValueInt(string text, string label, string[] allLabels, int defaultValue = 0)
 	{
 		var valueString = TryGetLabelledValue(text, label, allLabels, defaultValue + "");
 		if (int.TryParse(valueString.Split(' ')[0], out var result))
@@ -140,7 +140,7 @@ public class EngineUCI
 		return defaultValue;
 	}
 
-	static string TryGetLabelledValue(string text, string label, string[] allLabels, string defaultValue = "")
+	private static string TryGetLabelledValue(string text, string label, string[] allLabels, string defaultValue = "")
 	{
 		text = text.Trim();
 		if (text.Contains(label))
@@ -164,7 +164,7 @@ public class EngineUCI
 		return defaultValue;
 	}
 
-	void LogToFile(string text)
+	private static void LogToFile(string text)
 	{
 		if (!logToFile)
 			return;

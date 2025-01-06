@@ -5,9 +5,9 @@ namespace Chess.Core;
 
 public class RepetitionTable
 {
-	readonly ulong[] hashes;
-	readonly int[] startIndices;
-	int count;
+	private readonly ulong[] hashes;
+	private readonly int[] startIndices;
+	private int count;
 
 	public RepetitionTable()
 	{

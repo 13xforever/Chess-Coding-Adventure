@@ -27,7 +27,7 @@ public class TranspositionTable
 
 	public readonly int count;
 	public bool enabled = true;
-	Board board;
+	private Board board;
 
 	private static readonly int ttEntrySizeBytes = Marshal.SizeOf<Entry>();
 	private readonly Lock setLocker = new();
@@ -123,7 +123,7 @@ public class TranspositionTable
 		//}
 	}
 
-	int CorrectMateScoreForStorage(int score, int numPlySearched)
+	private int CorrectMateScoreForStorage(int score, int numPlySearched)
 	{
 		if (Searcher.IsMateScore(score))
 		{
@@ -133,7 +133,7 @@ public class TranspositionTable
 		return score;
 	}
 
-	int CorrectRetrievedMateScore(int score, int numPlySearched)
+	private int CorrectRetrievedMateScore(int score, int numPlySearched)
 	{
 		if (Searcher.IsMateScore(score))
 		{

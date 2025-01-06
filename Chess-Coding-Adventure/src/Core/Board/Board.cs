@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using CodingAdventureBot;
 
 namespace Chess.Core;
 // Represents the current state of the board during a game.
@@ -58,11 +59,11 @@ public sealed class Board
 
 
 	// # Private stuff
-	PieceList[] allPieceLists;
-	Stack<GameState> gameStateHistory;
-	FenUtility.PositionInfo StartPositionInfo;
-	bool cachedInCheckValue;
-	bool hasCachedInCheckValue;
+	private PieceList[] allPieceLists;
+	private Stack<GameState> gameStateHistory;
+	private FenUtility.PositionInfo StartPositionInfo;
+	private bool cachedInCheckValue;
+	private bool hasCachedInCheckValue;
 
 	public Board()
 	{
@@ -111,7 +112,17 @@ public sealed class Board
 			}
 
 			// Remove captured piece from bitboards/piece list
-			allPieceLists[capturedPiece].RemovePieceAtSquare(captureSquare);
+			try
+			{
+				allPieceLists[capturedPiece].RemovePieceAtSquare(captureSquare);
+			}
+			catch (IndexOutOfRangeException)
+			{
+				var board = BoardHelper.CreateDiagram(this).Split(Environment.NewLine);
+				EngineUCI.Respond($"info string Failed to capture {Piece.GetSymbol(capturedPiece)} with move {MoveUtility.GetMoveNameUCI(move)}");
+				foreach (var line in board)
+					EngineUCI.Respond($"info string {line}");
+			}
 			BitBoardUtility.ToggleSquare(ref PieceBitboards[capturedPiece], captureSquare);
 			BitBoardUtility.ToggleSquare(ref ColourBitboards[OpponentColourIndex], captureSquare);
 			newZobristKey ^= Zobrist.piecesArray[capturedPiece, captureSquare];
@@ -521,7 +532,7 @@ public sealed class Board
 	// 2. Movement of rook when castling
 	// 3. Removal of pawn from 1st/8th rank during pawn promotion
 	// 4. Addition of promoted piece during pawn promotion
-	void MovePiece(int piece, int startSquare, int targetSquare)
+	private void MovePiece(int piece, int startSquare, int targetSquare)
 	{
 		BitBoardUtility.ToggleSquares(ref PieceBitboards[piece], startSquare, targetSquare);
 		BitBoardUtility.ToggleSquares(ref ColourBitboards[MoveColourIndex], startSquare, targetSquare);
@@ -531,7 +542,7 @@ public sealed class Board
 		Square[targetSquare] = piece;
 	}
 
-	void UpdateSliderBitboards()
+	private void UpdateSliderBitboards()
 	{
 		var friendlyRook = Piece.MakePiece(Piece.Rook, MoveColour);
 		var friendlyQueen = Piece.MakePiece(Piece.Queen, MoveColour);
@@ -546,7 +557,7 @@ public sealed class Board
 		EnemyDiagonalSliders = PieceBitboards[enemyBishop] | PieceBitboards[enemyQueen];
 	}
 
-	void Initialize()
+	private void Initialize()
 	{
 		AllGameMoves = [];
 		KingSquare = new int[2];

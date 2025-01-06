@@ -10,12 +10,13 @@ namespace CodingAdventureBot;
 public class Bot
 {
 	// # Settings
-	const bool useOpeningBook = true;
-	const int maxBookPly = 16;
+	private const bool useOpeningBook = true;
+
+	private const int maxBookPly = 16;
 	// Limit the amount of time the bot can spend per move (mainly for
 	// games against human opponents, so not boring to play against).
-	const bool useMaxThinkTime = false;
-	const int maxThinkTimeMs = 2500;
+	private const bool useMaxThinkTime = false;
+	private const int maxThinkTimeMs = 2500;
 
 	// Public stuff
 	public event Action<string>? OnMoveChosen;
@@ -24,15 +25,15 @@ public class Bot
 	public bool LatestMoveIsBookMove { get; private set; }
 
 	// References
-	readonly Searcher searcher;
-	readonly Board board;
-	readonly OpeningBook book;
-	readonly AutoResetEvent searchWaitHandle;
-	CancellationTokenSource? cancelSearchTimer;
+	private readonly Searcher searcher;
+	private readonly Board board;
+	private readonly OpeningBook book;
+	private readonly AutoResetEvent searchWaitHandle;
+	private CancellationTokenSource? cancelSearchTimer;
 
 	// State
-	int currentSearchID;
-	bool isQuitting;
+	private int currentSearchID;
+	private bool isQuitting;
 
 	public Bot()
 	{
@@ -101,7 +102,7 @@ public class Bot
 		}
 	}
 
-	void StartSearch(int timeMs)
+	private void StartSearch(int timeMs)
 	{
 		currentSearchID++;
 		searchWaitHandle.Set();
@@ -109,7 +110,7 @@ public class Bot
 		Task.Delay(timeMs, cancelSearchTimer.Token).ContinueWith((t) => EndSearch(currentSearchID));
 	}
 
-	void SearchThread()
+	private void SearchThread()
 	{
 		while (!isQuitting)
 		{
@@ -131,7 +132,7 @@ public class Bot
 
 	public string GetBoardDiagram() => board.ToString();
 
-	void EndSearch()
+	private void EndSearch()
 	{
 		cancelSearchTimer?.Cancel();
 		if (IsThinking)
@@ -140,7 +141,7 @@ public class Bot
 		}
 	}
 
-	void EndSearch(int searchID)
+	private void EndSearch(int searchID)
 	{
 		// If search timer has been cancelled, the search will have been stopped already
 		if (cancelSearchTimer is { IsCancellationRequested: true })
@@ -154,7 +155,7 @@ public class Bot
 		}
 	}
 
-	void OnSearchComplete(Move move)
+	private void OnSearchComplete(Move move)
 	{
 		IsThinking = false;
 
@@ -163,7 +164,7 @@ public class Bot
 		OnMoveChosen?.Invoke(moveName);
 	}
 
-	bool TryGetOpeningBookMove(out Move bookMove)
+	private bool TryGetOpeningBookMove(out Move bookMove)
 	{
 		if (useOpeningBook && board.PlyCount <= maxBookPly && book.TryGetBookMove(board, out var moveString))
 		{

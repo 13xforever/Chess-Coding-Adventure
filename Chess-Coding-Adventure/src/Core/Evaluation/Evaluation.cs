@@ -11,12 +11,12 @@ public class Evaluation
 	public const int RookValue = 500;
 	public const int QueenValue = 900;
 
-	static readonly int[] passedPawnBonuses = [0, 120, 80, 50, 30, 15, 15];
-	static readonly int[] isolatedPawnPenaltyByCount = [0, -10, -25, -50, -75, -75, -75, -75, -75];
-	static readonly int[] kingPawnShieldScores = [4, 7, 4, 3, 6, 3];
+	private static readonly int[] passedPawnBonuses = [0, 120, 80, 50, 30, 15, 15];
+	private static readonly int[] isolatedPawnPenaltyByCount = [0, -10, -25, -50, -75, -75, -75, -75, -75];
+	private static readonly int[] kingPawnShieldScores = [4, 7, 4, 3, 6, 3];
 
-	const float endgameMaterialStart = RookValue * 2 + BishopValue + KnightValue;
-	Board board;
+	private const float endgameMaterialStart = RookValue * 2 + BishopValue + KnightValue;
+	private Board board;
 
 	public EvaluationData whiteEval;
 	public EvaluationData blackEval;
@@ -171,15 +171,14 @@ public class Evaluation
 	}
 
 
-
-	float EndgamePhaseWeight(int materialCountWithoutPawns)
+	private float EndgamePhaseWeight(int materialCountWithoutPawns)
 	{
 		const float multiplier = 1 / endgameMaterialStart;
 		return 1 - Math.Min(1, materialCountWithoutPawns * multiplier);
 	}
 
 	// As game transitions to endgame, and if up material, then encourage moving king closer to opponent king
-	int MopUpEval(bool isWhite, MaterialInfo myMaterial, MaterialInfo enemyMaterial)
+	private int MopUpEval(bool isWhite, MaterialInfo myMaterial, MaterialInfo enemyMaterial)
 	{
 		if (myMaterial.materialScore > enemyMaterial.materialScore + PawnValue * 2 && enemyMaterial.endgameT > 0)
 		{
@@ -198,7 +197,7 @@ public class Evaluation
 		return 0;
 	}
 
-	int CountMaterial(int colourIndex)
+	private int CountMaterial(int colourIndex)
 	{
 		var material = 0;
 		material += board.Pawns[colourIndex].Count * PawnValue;
@@ -210,7 +209,7 @@ public class Evaluation
 		return material;
 	}
 
-	int EvaluatePieceSquareTables(bool isWhite, float endgameT)
+	private int EvaluatePieceSquareTables(bool isWhite, float endgameT)
 	{
 		var value = 0;
 		var colourIndex = isWhite ? Board.WhiteIndex : Board.BlackIndex;
@@ -233,7 +232,7 @@ public class Evaluation
 		return value;
 	}
 
-	static int EvaluatePieceSquareTable(int[] table, PieceList pieceList, bool isWhite)
+	private static int EvaluatePieceSquareTable(int[] table, PieceList pieceList, bool isWhite)
 	{
 		var value = 0;
 		for (var i = 0; i < pieceList.Count; i++)
@@ -257,7 +256,7 @@ public class Evaluation
 		}
 	}
 
-	MaterialInfo GetMaterialInfo(int colourIndex)
+	private MaterialInfo GetMaterialInfo(int colourIndex)
 	{
 		var numPawns = board.Pawns[colourIndex].Count;
 		var numKnights = board.Knights[colourIndex].Count;

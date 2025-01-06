@@ -123,7 +123,7 @@ public static class FenUtility
 		return fen;
 	}
 
-	static bool EnPassantCanBeCaptured(int epFileIndex, int epRankIndex, Board board)
+	private static bool EnPassantCanBeCaptured(int epFileIndex, int epRankIndex, Board board)
 	{
 		var captureFromA = new Coord(epFileIndex - 1, epRankIndex + (board.IsWhiteToMove ? -1 : 1));
 		var captureFromB = new Coord(epFileIndex + 1, epRankIndex + (board.IsWhiteToMove ? -1 : 1));

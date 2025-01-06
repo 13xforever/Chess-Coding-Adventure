@@ -10,12 +10,12 @@ namespace Chess.Core;
 public class Searcher
 {
 	// Constants
-	const int transpositionTableSizeMB = 256;
-	const int maxExtentions = 16;
+	private const int transpositionTableSizeMB = 256;
+	private const int maxExtentions = 16;
 
-	const int immediateMateScore = 100000;
-	const int positiveInfinity = 9999999;
-	const int negativeInfinity = -positiveInfinity;
+	private const int immediateMateScore = 100000;
+	private const int positiveInfinity = 9999999;
+	private const int negativeInfinity = -positiveInfinity;
 
 	public event Action<Move>? OnSearchComplete;
 	public event Action<string>? OnInfo;
@@ -24,32 +24,32 @@ public class Searcher
 	public int CurrentDepth;
 	public Move BestMoveSoFar => bestMove;
 	public int BestEvalSoFar => bestEval;
-	bool isPlayingWhite;
-	Move bestMoveThisIteration;
-	int bestEvalThisIteration;
+	private bool isPlayingWhite;
+	private Move bestMoveThisIteration;
+	private int bestEvalThisIteration;
 	private string bestPvThisEvaluation;
-	Move bestMove;
-	int bestEval;
-	bool hasSearchedAtLeastOneMove;
-	bool searchCancelled;
+	private Move bestMove;
+	private int bestEval;
+	private bool hasSearchedAtLeastOneMove;
+	private bool searchCancelled;
 
 	private int currMoveNumber, nodeCount, lastNodeCount, maxDepth;
 	private Stopwatch timer = new();
 
 	// Diagnostics
 	public SearchDiagnostics searchDiagnostics;
-	int currentIterationDepth;
-	Stopwatch searchIterationTimer;
-	Stopwatch searchTotalTimer;
+	private int currentIterationDepth;
+	private Stopwatch searchIterationTimer;
+	private Stopwatch searchTotalTimer;
 	public string debugInfo;
 
 	// References
-	readonly TranspositionTable transpositionTable;
-	readonly RepetitionTable repetitionTable;
-	readonly MoveGenerator moveGenerator;
-	readonly MoveOrdering moveOrderer;
-	readonly Evaluation evaluation;
-	readonly Board board;
+	private readonly TranspositionTable transpositionTable;
+	private readonly RepetitionTable repetitionTable;
+	private readonly MoveGenerator moveGenerator;
+	private readonly MoveOrdering moveOrderer;
+	private readonly Evaluation evaluation;
+	private readonly Board board;
 
 	public Searcher(Board board)
 	{
@@ -103,7 +103,7 @@ public class Searcher
 	// Run iterative deepening. This means doing a full search with a depth of 1, then with a depth of 2, and so on.
 	// This allows the search to be cancelled at any time and still yield a useful result.
 	// Thanks to the transposition table and move ordering, this idea is not nearly as terrible as it sounds.
-	void RunIterativeDeepeningSearch()
+	private void RunIterativeDeepeningSearch()
 	{
 		currMoveNumber = 1;
 		nodeCount = 0;
@@ -131,7 +131,8 @@ public class Searcher
 					score = $"mate {(int)Ceiling(NumPlyToMateFromScore(curEval) / 2.0)}";
 				var nps = (int)((nodeCount - lastNodeCount) / timer.Elapsed.TotalSeconds);
 				var moveList = GetBestMoveChain(bestMoveThisIteration, currentIterationDepth);
-				var pv = string.Join(' ', moveList.Select(MoveUtility.GetMoveNameUCI)).Replace("=", "");
+				//var pv = string.Join(' ', moveList.Select(MoveUtility.GetMoveNameUCI)).Replace("=", "");
+				var pv = MoveUtility.GetMoveNameUCI(curMove).Replace("=", "");
 				OnInfo?.Invoke($"depth {currentIterationDepth} time {(int)searchTotalTimer.ElapsedMilliseconds} nodes {nodeCount} nps {nps} score {score} hashfull {transpositionTable.Hashfull} pv {pv}");
 				lastNodeCount = nodeCount;
 				timer.Restart();
@@ -210,7 +211,7 @@ public class Searcher
 	}
 
 
-	int Search(int plyRemaining, int plyFromRoot, int alpha, int beta, int numExtensions = 0, Move prevMove = default, bool prevWasCapture = false)
+	private int Search(int plyRemaining, int plyFromRoot, int alpha, int beta, int numExtensions = 0, Move prevMove = default, bool prevWasCapture = false)
 	{
 		if (searchCancelled)
 		{
@@ -395,7 +396,7 @@ public class Searcher
 	}
 
 	// Search capture moves until a 'quiet' position is reached.
-	int QuiescenceSearch(int alpha, int beta)
+	private int QuiescenceSearch(int alpha, int beta)
 	{
 		if (searchCancelled)
 		{

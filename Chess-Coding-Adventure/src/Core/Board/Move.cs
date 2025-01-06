@@ -15,7 +15,7 @@ namespace Chess.Core;
 public readonly struct Move : IEquatable<Move>
 {
 	// 16bit move value
-	readonly ushort moveValue;
+	private readonly ushort moveValue;
 
 	// Flags
 	public const int NoFlag               = 0b_0000;
@@ -28,9 +28,9 @@ public readonly struct Move : IEquatable<Move>
 	public const int PromoteToBishopFlag  = 0b_0111;
 
 	// Masks
-	const ushort startSquareMask  = 0b_0000_000000_111111;
-	const ushort targetSquareMask = 0b_0000_111111_000000;
-	const ushort flagMask         = 0b_1111_000000_000000;
+	private const ushort startSquareMask  = 0b_0000_000000_111111;
+	private const ushort targetSquareMask = 0b_0000_111111_000000;
+	private const ushort flagMask         = 0b_1111_000000_000000;
 
 	public Move(ushort moveValue)
 	{

@@ -41,8 +41,8 @@ public static class Piece
 	];
 
 	// Bit Masks
-	const int typeMask   = 0b_0111;
-	const int colourMask = 0b_1000;
+	private const int typeMask   = 0b_0111;
+	private const int colourMask = 0b_1000;
 
 	public static int MakePiece(int pieceType, int pieceColour) => pieceType | pieceColour;
 
