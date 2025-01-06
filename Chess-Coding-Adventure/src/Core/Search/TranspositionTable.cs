@@ -1,4 +1,8 @@
-﻿namespace Chess.Core;
+﻿using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+namespace Chess.Core;
 
 // Thanks to https://web.archive.org/web/20071031100051/http://www.brucemo.com/compchess/programming/hashing.htm
 public class TranspositionTable
@@ -14,27 +18,39 @@ public class TranspositionTable
 	// position could be even higher, making the stored value the lower bound of the actual value.
 	public const int LowerBound = 1;
 	// No move during the search resulted in a position that was better than the current player could get from playing a
-	// different move in an earlier position (i.e eval was <= alpha for all moves in the position).
+	// different move in an earlier position (i.e. eval was <= alpha for all moves in the position).
 	// Due to the way alpha-beta search works, the value we get here won't be the exact evaluation of the position,
 	// but rather the upper bound of the evaluation. This means that the evaluation is, at most, equal to this value.
 	public const int UpperBound = 2;
 
 	public Entry[] entries;
 
-	public readonly ulong count;
+	public readonly int count;
 	public bool enabled = true;
 	Board board;
+
+	private static readonly int ttEntrySizeBytes = Marshal.SizeOf<Entry>();
+	private readonly Lock setLocker = new();
+	private readonly HashSet<ulong> setEntries;
+	public int Hashfull
+	{
+		get
+		{
+			lock (setLocker)
+				return (int)(setEntries.Count * 100_0L / count);
+		}
+	}
 
 	public TranspositionTable(Board board, int sizeMB)
 	{
 		this.board = board;
 
-		var ttEntrySizeBytes = System.Runtime.InteropServices.Marshal.SizeOf<Entry>();
 		var desiredTableSizeInBytes = sizeMB * 1024 * 1024;
 		var numEntries = desiredTableSizeInBytes / ttEntrySizeBytes;
 
-		count = (ulong)(numEntries);
+		count = numEntries;
 		entries = new Entry[numEntries];
+		setEntries = new(numEntries);
 	}
 
 	public void Clear()
@@ -43,9 +59,10 @@ public class TranspositionTable
 		{
 			entries[i] = new();
 		}
+		lock (setLocker) setEntries.Clear();
 	}
 
-	public ulong Index => board.CurrentGameState.zobristKey % count;
+	public ulong Index => board.CurrentGameState.zobristKey % (ulong)count;
 
 	public Move TryGetStoredMove() => entries[Index].move;
 
@@ -101,7 +118,8 @@ public class TranspositionTable
 
 		//if (depth >= entries[Index].depth) {
 		var entry = new Entry(board.CurrentGameState.zobristKey, CorrectMateScoreForStorage(eval, numPlySearched), (byte)depth, (byte)evalType, move);
-		entries[Index] = entry;
+		entries[index] = entry;
+		lock (setLocker) setEntries.Add(index);
 		//}
 	}
 
@@ -132,7 +150,6 @@ public class TranspositionTable
 
 	public struct Entry
 	{
-
 		public readonly ulong key;
 		public readonly int value;
 		public readonly Move move;
@@ -148,11 +165,6 @@ public class TranspositionTable
 			this.depth = depth; // depth is how many ply were searched ahead from this position
 			this.nodeType = nodeType;
 			this.move = move;
-		}
-
-		public static int GetSize()
-		{
-			return System.Runtime.InteropServices.Marshal.SizeOf<Entry>();
 		}
 	}
 }

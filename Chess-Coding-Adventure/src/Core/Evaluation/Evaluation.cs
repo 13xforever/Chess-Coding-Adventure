@@ -1,4 +1,6 @@
-﻿namespace Chess.Core;
+﻿using System;
+
+namespace Chess.Core;
 
 public class Evaluation
 {
@@ -96,7 +98,7 @@ public class Evaluation
 		}
 		else
 		{
-			var enemyDevelopmentScore = System.Math.Clamp((enemyPieceSquareScore + 10) / 130f, 0, 1);
+			var enemyDevelopmentScore = Math.Clamp((enemyPieceSquareScore + 10) / 130f, 0, 1);
 			uncastledKingPenalty = (int)(50 * enemyDevelopmentScore);
 			//Debug.Log(isWhite + "  " + uncastledKingPenalty);
 			//Debug.Log("File penalty: " + filePenalty);
@@ -107,7 +109,7 @@ public class Evaluation
 		if (enemyMaterial.numRooks > 1 || enemyMaterial is { numRooks: > 0, numQueens: > 0 })
 		{
 
-			var clampedKingFile = System.Math.Clamp(kingFile, 1, 6);
+			var clampedKingFile = Math.Clamp(kingFile, 1, 6);
 			var myPawns = enemyMaterial.enemyPawns;
 			for (var attackFile = clampedKingFile; attackFile <= clampedKingFile + 1; attackFile++)
 			{
@@ -173,7 +175,7 @@ public class Evaluation
 	float EndgamePhaseWeight(int materialCountWithoutPawns)
 	{
 		const float multiplier = 1 / endgameMaterialStart;
-		return 1 - System.Math.Min(1, materialCountWithoutPawns * multiplier);
+		return 1 - Math.Min(1, materialCountWithoutPawns * multiplier);
 	}
 
 	// As game transitions to endgame, and if up material, then encourage moving king closer to opponent king
@@ -312,7 +314,7 @@ public class Evaluation
 
 			const int endgameStartWeight = 2 * rookEndgameWeight + 2 * bishopEndgameWeight + 2 * knightEndgameWeight + queenEndgameWeight;
 			var endgameWeightSum = numQueens * queenEndgameWeight + numRooks * rookEndgameWeight + numBishops * bishopEndgameWeight + numKnights * knightEndgameWeight;
-			endgameT = 1 - System.Math.Min(1, endgameWeightSum / (float)endgameStartWeight);
+			endgameT = 1 - Math.Min(1, endgameWeightSum / (float)endgameStartWeight);
 		}
 	}
 }

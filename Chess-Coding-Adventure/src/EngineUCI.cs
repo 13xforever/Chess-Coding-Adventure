@@ -17,6 +17,7 @@ public class EngineUCI
 	{
 		engine = new();
 		engine.OnMoveChosen += OnMoveChosen;
+		engine.OnInfo += s => Respond("info " + s);
 	}
 
 	public void ReceiveCommand(string message)

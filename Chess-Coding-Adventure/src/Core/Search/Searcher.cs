@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Diagnostics;
+using System.Threading;
 using static System.Math;
 
 namespace Chess.Core;
@@ -6,7 +8,7 @@ namespace Chess.Core;
 public class Searcher
 {
 	// Constants
-	const int transpositionTableSizeMB = 64;
+	const int transpositionTableSizeMB = 256;
 	const int maxExtentions = 16;
 
 	const int immediateMateScore = 100000;
@@ -14,6 +16,7 @@ public class Searcher
 	const int negativeInfinity = -positiveInfinity;
 
 	public event Action<Move>? OnSearchComplete;
+	public event Action<string>? OnInfo;
 
 	// State
 	public int CurrentDepth;
@@ -22,16 +25,20 @@ public class Searcher
 	bool isPlayingWhite;
 	Move bestMoveThisIteration;
 	int bestEvalThisIteration;
+	private string bestPvThisEvaluation;
 	Move bestMove;
 	int bestEval;
 	bool hasSearchedAtLeastOneMove;
 	bool searchCancelled;
 
+	private int currMoveNumber, nodeCount, lastNodeCount;
+	private Stopwatch timer = new();
+
 	// Diagnostics
 	public SearchDiagnostics searchDiagnostics;
 	int currentIterationDepth;
-	System.Diagnostics.Stopwatch searchIterationTimer;
-	System.Diagnostics.Stopwatch searchTotalTimer;
+	Stopwatch searchIterationTimer;
+	Stopwatch searchTotalTimer;
 	public string debugInfo;
 
 	// References
@@ -96,6 +103,11 @@ public class Searcher
 	// Thanks to the transposition table and move ordering, this idea is not nearly as terrible as it sounds.
 	void RunIterativeDeepeningSearch()
 	{
+		currMoveNumber = 1;
+		nodeCount = 0;
+		lastNodeCount = 0;
+		timer.Restart();
+		searchTotalTimer.Restart();
 		for (var searchDepth = 1; searchDepth <= 256; searchDepth++)
 		{
 			hasSearchedAtLeastOneMove = false;
@@ -104,6 +116,21 @@ public class Searcher
 			currentIterationDepth = searchDepth;
 			Search(searchDepth, 0, negativeInfinity, positiveInfinity);
 
+			if (timer.ElapsedMilliseconds > 1000 && (bestEvalThisIteration != int.MinValue || bestEval != int.MinValue))
+			{
+				var (curEval, curMove) = (bestEvalThisIteration, bestMoveThisIteration);
+				if (curEval == int.MinValue)
+					(curEval, curMove) = (bestEval, bestMove);
+				var curMoveNotation = MoveUtility.GetMoveNameUCI(curMove).Replace("=", "");
+				OnInfo?.Invoke($"currmove {curMoveNotation} currmovenumber {currMoveNumber}");
+				var score = $"cp {curEval}";
+				if (IsMateScore(curEval))
+					score = $"mate {(int)Ceiling(NumPlyToMateFromScore(curEval) / 2.0)}";
+				var nps = (int)((nodeCount - lastNodeCount) / timer.Elapsed.TotalSeconds);
+				OnInfo?.Invoke($"depth {currentIterationDepth} time {(int)searchTotalTimer.ElapsedMilliseconds} nodes {nodeCount} nps {nps} score {score} hashfull {transpositionTable.Hashfull} pv {curMoveNotation}");
+				lastNodeCount = nodeCount;
+				timer.Restart();
+			}
 			if (searchCancelled)
 			{
 				if (hasSearchedAtLeastOneMove)
@@ -283,6 +310,7 @@ public class Searcher
 				eval = -Search(plyRemaining - 1 + extension, plyFromRoot + 1, -beta, -alpha, numExtensions + extension, move, isCapture);
 			}
 			board.UnmakeMove(moves[i], inSearch: true);
+			Interlocked.Increment(ref nodeCount);
 
 			if (searchCancelled)
 			{
@@ -297,7 +325,7 @@ public class Searcher
 				// even better move we haven't looked at yet, and so the current eval is a lower bound on the actual eval.
 				transpositionTable.StoreEvaluation(plyRemaining, plyFromRoot, beta, TranspositionTable.LowerBound, moves[i]);
 
-				// Update killer moves and history heuristic (note: don't include captures as theres are ranked highly anyway)
+				// Update killer moves and history heuristic (note: don't include captures as they are ranked highly anyway)
 				if (!isCapture)
 				{
 					if (plyFromRoot < MoveOrdering.maxKillerMovePly)
@@ -445,5 +473,4 @@ public class Searcher
 
 		public int maxExtentionReachedInSearch;
 	}
-
 }

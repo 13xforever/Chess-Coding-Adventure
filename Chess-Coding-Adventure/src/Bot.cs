@@ -19,6 +19,7 @@ public class Bot
 
 	// Public stuff
 	public event Action<string>? OnMoveChosen;
+	public event Action<string>? OnInfo;
 	public bool IsThinking { get; private set; }
 	public bool LatestMoveIsBookMove { get; private set; }
 
@@ -38,6 +39,7 @@ public class Bot
 		board = Board.CreateBoard();
 		searcher = new(board);
 		searcher.OnSearchComplete += OnSearchComplete;
+		searcher.OnInfo += s => OnInfo?.Invoke(s);
 
 		book = new(Chess_Coding_Adventure.Properties.Resources.Book);
 		searchWaitHandle = new(false);
