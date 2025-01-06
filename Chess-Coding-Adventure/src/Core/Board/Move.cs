@@ -6,9 +6,13 @@ Bits 0-5: start square index
 Bits 6-11: target square index
 Bits 12-15: flag (promotion type, etc)
 */
+
+using System;
+using System.Diagnostics.CodeAnalysis;
+
 namespace Chess.Core;
 
-public readonly struct Move
+public readonly struct Move : IEquatable<Move>
 {
 	// 16bit move value
 	readonly ushort moveValue;
@@ -73,4 +77,10 @@ public readonly struct Move
 
 	public static Move NullMove => new(0);
 	public static bool SameMove(Move a, Move b) => a.moveValue == b.moveValue;
+	
+	public override bool Equals([NotNullWhen(true)] object? obj) => obj is Move other && Equals(other);
+	public bool Equals(Move other) => moveValue == other.moveValue;
+	public override int GetHashCode() => moveValue.GetHashCode();
+	public static bool operator ==(Move left, Move right) => left.Equals(right);
+	public static bool operator !=(Move left, Move right) => !left.Equals(right);
 }

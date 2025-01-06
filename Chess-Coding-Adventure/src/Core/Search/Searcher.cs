@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using static System.Math;
 
@@ -31,7 +33,7 @@ public class Searcher
 	bool hasSearchedAtLeastOneMove;
 	bool searchCancelled;
 
-	private int currMoveNumber, nodeCount, lastNodeCount;
+	private int currMoveNumber, nodeCount, lastNodeCount, maxDepth;
 	private Stopwatch timer = new();
 
 	// Diagnostics
@@ -106,6 +108,7 @@ public class Searcher
 		currMoveNumber = 1;
 		nodeCount = 0;
 		lastNodeCount = 0;
+		maxDepth = 0;
 		timer.Restart();
 		searchTotalTimer.Restart();
 		for (var searchDepth = 1; searchDepth <= 256; searchDepth++)
@@ -116,7 +119,7 @@ public class Searcher
 			currentIterationDepth = searchDepth;
 			Search(searchDepth, 0, negativeInfinity, positiveInfinity);
 
-			if (timer.ElapsedMilliseconds > 1000 && (bestEvalThisIteration != int.MinValue || bestEval != int.MinValue))
+			if (timer.ElapsedMilliseconds > 100 && (bestEvalThisIteration != int.MinValue || bestEval != int.MinValue))
 			{
 				var (curEval, curMove) = (bestEvalThisIteration, bestMoveThisIteration);
 				if (curEval == int.MinValue)
@@ -127,7 +130,9 @@ public class Searcher
 				if (IsMateScore(curEval))
 					score = $"mate {(int)Ceiling(NumPlyToMateFromScore(curEval) / 2.0)}";
 				var nps = (int)((nodeCount - lastNodeCount) / timer.Elapsed.TotalSeconds);
-				OnInfo?.Invoke($"depth {currentIterationDepth} time {(int)searchTotalTimer.ElapsedMilliseconds} nodes {nodeCount} nps {nps} score {score} hashfull {transpositionTable.Hashfull} pv {curMoveNotation}");
+				var moveList = GetBestMoveChain(bestMoveThisIteration, currentIterationDepth);
+				var pv = string.Join(' ', moveList.Select(MoveUtility.GetMoveNameUCI)).Replace("=", "");
+				OnInfo?.Invoke($"depth {currentIterationDepth} time {(int)searchTotalTimer.ElapsedMilliseconds} nodes {nodeCount} nps {nps} score {score} hashfull {transpositionTable.Hashfull} pv {pv}");
 				lastNodeCount = nodeCount;
 				timer.Restart();
 			}
@@ -174,6 +179,24 @@ public class Searcher
 				}
 			}
 		}
+	}
+
+	private List<Move> GetBestMoveChain(Move move, int maxDepth)
+	{
+		var result = new List<Move>();
+		var depth = 0;
+		do
+		{
+			result.Add(move);
+			depth++;
+			board.MakeMove(move, true);
+			move = transpositionTable.TryGetStoredMove();
+			if (move == Move.NullMove)
+				break;
+		} while (depth <= maxDepth);
+		foreach (var m in result.AsEnumerable().Reverse())
+			board.UnmakeMove(m, true);
+		return result;
 	}
 
 	public (Move move, int eval) GetSearchResult()
