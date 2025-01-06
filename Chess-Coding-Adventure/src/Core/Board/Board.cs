@@ -116,12 +116,14 @@ public sealed class Board
 			{
 				allPieceLists[capturedPiece].RemovePieceAtSquare(captureSquare);
 			}
-			catch (IndexOutOfRangeException)
+			catch (IndexOutOfRangeException e)
 			{
-				var board = BoardHelper.CreateDiagram(this).Split(Environment.NewLine);
-				EngineUCI.Respond($"info string Failed to capture {Piece.GetSymbol(capturedPiece)} with move {MoveUtility.GetMoveNameUCI(move)}");
-				foreach (var line in board)
+				var boardLines = BoardHelper.CreateDiagram(this).Split(Environment.NewLine);
+				var moveStr = MoveUtility.GetMoveNameUCI(move);
+				EngineUCI.Respond($"info string Failed to capture {Piece.GetSymbol(capturedPiece)} with move {moveStr}");
+				foreach (var line in boardLines)
 					EngineUCI.Respond($"info string {line}");
+				throw new InvalidOperationException(moveStr, e);
 			}
 			BitBoardUtility.ToggleSquare(ref PieceBitboards[capturedPiece], captureSquare);
 			BitBoardUtility.ToggleSquare(ref ColourBitboards[OpponentColourIndex], captureSquare);

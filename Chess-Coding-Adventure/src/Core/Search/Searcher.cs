@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using CodingAdventureBot;
 using static System.Math;
 
 namespace Chess.Core;
@@ -117,7 +118,15 @@ public class Searcher
 			debugInfo += "\nStarting Iteration: " + searchDepth;
 			searchIterationTimer.Restart();
 			currentIterationDepth = searchDepth;
-			Search(searchDepth, 0, negativeInfinity, positiveInfinity);
+			try
+			{
+				Search(searchDepth, 0, negativeInfinity, positiveInfinity);
+			}
+			catch (InvalidOperationException e)
+			{
+				EngineUCI.Respond("info string Repro pv: " + e.Message);
+				throw;
+			}
 
 			if (timer.ElapsedMilliseconds > 100 && (bestEvalThisIteration != int.MinValue || bestEval != int.MinValue))
 			{
@@ -126,14 +135,19 @@ public class Searcher
 					(curEval, curMove) = (bestEval, bestMove);
 				var curMoveNotation = MoveUtility.GetMoveNameUCI(curMove).Replace("=", "");
 				OnInfo?.Invoke($"currmove {curMoveNotation} currmovenumber {currMoveNumber}");
+
+				var selDepth = "";
+				if (maxDepth > currentIterationDepth)
+					selDepth = $"seldepth {maxDepth}";
 				var score = $"cp {curEval}";
 				if (IsMateScore(curEval))
 					score = $"mate {(int)Ceiling(NumPlyToMateFromScore(curEval) / 2.0)}";
 				var nps = (int)((nodeCount - lastNodeCount) / timer.Elapsed.TotalSeconds);
 				var moveList = GetBestMoveChain(bestMoveThisIteration, currentIterationDepth);
-				//var pv = string.Join(' ', moveList.Select(MoveUtility.GetMoveNameUCI)).Replace("=", "");
-				var pv = MoveUtility.GetMoveNameUCI(curMove).Replace("=", "");
-				OnInfo?.Invoke($"depth {currentIterationDepth} time {(int)searchTotalTimer.ElapsedMilliseconds} nodes {nodeCount} nps {nps} score {score} hashfull {transpositionTable.Hashfull} pv {pv}");
+				var pv = moveList.Count > 0
+					? string.Join(' ', moveList.Select(MoveUtility.GetMoveNameUCI))
+					: MoveUtility.GetMoveNameUCI(curMove);
+				OnInfo?.Invoke($"depth {currentIterationDepth} {selDepth} time {(int)searchTotalTimer.ElapsedMilliseconds} nodes {nodeCount} nps {nps} score {score} hashfull {transpositionTable.Hashfull} pv {pv}");
 				lastNodeCount = nodeCount;
 				timer.Restart();
 			}
@@ -184,10 +198,17 @@ public class Searcher
 
 	private List<Move> GetBestMoveChain(Move move, int maxDepth)
 	{
+		var startDiagram = BoardHelper.CreateDiagram(board);
 		var result = new List<Move>();
 		var depth = 0;
+		Span<Move> moves = stackalloc Move[256];
 		do
 		{
+			var tmp = moves;
+			moveGenerator.GenerateMoves(board, ref tmp, capturesOnly: false);
+			if (!tmp.Contains(move))
+				break;
+			
 			result.Add(move);
 			depth++;
 			board.MakeMove(move, true);
@@ -197,6 +218,9 @@ public class Searcher
 		} while (depth <= maxDepth);
 		foreach (var m in result.AsEnumerable().Reverse())
 			board.UnmakeMove(m, true);
+		var endDiagram = BoardHelper.CreateDiagram(board);
+		if (endDiagram != startDiagram)
+			throw new InvalidOperationException("Corrupted game state");
 		return result;
 	}
 
@@ -220,6 +244,8 @@ public class Searcher
 
 		if (plyFromRoot > 0)
 		{
+			maxDepth = Max(maxDepth, plyFromRoot);
+			
 			// Detect draw by three-fold repetition.
 			// (Note: returns a draw score even if this position has only appeared once for sake of simplicity)
 			if (board.CurrentGameState.fiftyMoveCounter >= 100 || repetitionTable.Contains(board.CurrentGameState.zobristKey))
@@ -299,7 +325,15 @@ public class Searcher
 			var move = moves[i];
 			var capturedPieceType = Piece.PieceType(board.Square[move.TargetSquare]);
 			var isCapture = capturedPieceType != Piece.None;
-			board.MakeMove(moves[i], inSearch: true);
+			try
+			{
+				board.MakeMove(moves[i], inSearch: true);
+			}
+			catch (InvalidOperationException e)
+			{
+				var moveStr = MoveUtility.GetMoveNameUCI(move);
+				throw new InvalidOperationException($"{moveStr} {e.Message}", e);
+			}
 
 			// Extend the depth of the search in certain interesting cases
 			var extension = 0;
