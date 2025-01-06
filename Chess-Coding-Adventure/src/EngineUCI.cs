@@ -6,16 +6,16 @@ namespace CodingAdventureBot;
 
 public class EngineUCI
 {
-	readonly Bot player;
-	static readonly bool logToFile = false;
+	private readonly Bot engine;
+	private static readonly bool logToFile = false;
 
-	static readonly string[] positionLabels = new[] { "position", "fen", "moves" };
-	static readonly string[] goLabels = new[] { "go", "movetime", "wtime", "btime", "winc", "binc", "movestogo" };
+	private static readonly string[] positionLabels = ["position", "fen", "moves"];
+	private static readonly string[] goLabels = ["go", "movetime", "wtime", "btime", "winc", "binc", "movestogo"];
 
 	public EngineUCI()
 	{
-		player = new Bot();
-		player.OnMoveChosen += OnMoveChosen;
+		engine = new();
+		engine.OnMoveChosen += OnMoveChosen;
 	}
 
 	public void ReceiveCommand(string message)
@@ -23,8 +23,7 @@ public class EngineUCI
 		//Console.WriteLine(message);
 		LogToFile("Command received: " + message);
 		message = message.Trim();
-		string messageType = message.Split(' ')[0].ToLower();
-
+		var messageType = message.Split(' ')[0].ToLower();
 		switch (messageType)
 		{
 			case "uci":
@@ -34,7 +33,7 @@ public class EngineUCI
 				Respond("readyok");
 				break;
 			case "ucinewgame":
-				player.NotifyNewGame();
+				engine.NotifyNewGame();
 				break;
 			case "position":
 				ProcessPositionCommand(message);
@@ -43,16 +42,16 @@ public class EngineUCI
 				ProcessGoCommand(message);
 				break;
 			case "stop":
-				if (player.IsThinking)
+				if (engine.IsThinking)
 				{
-					player.StopThinking();
+					engine.StopThinking();
 				}
 				break;
 			case "quit":
-				player.Quit();
+				engine.Quit();
 				break;
 			case "d":
-				Console.WriteLine(player.GetBoardDiagram());
+				Console.WriteLine(engine.GetBoardDiagram());
 				break;
 			default:
 				LogToFile($"Unrecognized command: {messageType}");
@@ -62,7 +61,7 @@ public class EngineUCI
 
 	void OnMoveChosen(string move)
 	{
-		LogToFile("OnMoveChosen: book move = " + player.LatestMoveIsBookMove);
+		LogToFile("OnMoveChosen: book move = " + engine.LatestMoveIsBookMove);
 		Respond("bestmove " + move);
 	}
 
@@ -70,19 +69,19 @@ public class EngineUCI
 	{
 		if (message.Contains("movetime"))
 		{
-			int moveTimeMs = TryGetLabelledValueInt(message, "movetime", goLabels, 0);
-			player.ThinkTimed(moveTimeMs);
+			var moveTimeMs = TryGetLabelledValueInt(message, "movetime", goLabels, 0);
+			engine.ThinkTimed(moveTimeMs);
 		}
 		else
 		{
-			int timeRemainingWhiteMs = TryGetLabelledValueInt(message, "wtime", goLabels, 0);
-			int timeRemainingBlackMs = TryGetLabelledValueInt(message, "btime", goLabels, 0);
-			int incrementWhiteMs = TryGetLabelledValueInt(message, "winc", goLabels, 0);
-			int incrementBlackMs = TryGetLabelledValueInt(message, "binc", goLabels, 0);
+			var timeRemainingWhiteMs = TryGetLabelledValueInt(message, "wtime", goLabels, 0);
+			var timeRemainingBlackMs = TryGetLabelledValueInt(message, "btime", goLabels, 0);
+			var incrementWhiteMs = TryGetLabelledValueInt(message, "winc", goLabels, 0);
+			var incrementBlackMs = TryGetLabelledValueInt(message, "binc", goLabels, 0);
 
-			int thinkTime = player.ChooseThinkTime(timeRemainingWhiteMs, timeRemainingBlackMs, incrementWhiteMs, incrementBlackMs);
+			var thinkTime = engine.ChooseThinkTime(timeRemainingWhiteMs, timeRemainingBlackMs, incrementWhiteMs, incrementBlackMs);
 			LogToFile("Thinking for: " + thinkTime + " ms.");
-			player.ThinkTimed(thinkTime);
+			engine.ThinkTimed(thinkTime);
 		}
 
 	}
@@ -95,11 +94,11 @@ public class EngineUCI
 		// FEN
 		if (message.ToLower().Contains("startpos"))
 		{
-			player.SetPosition(FenUtility.StartPositionFEN);
+			engine.SetPosition(FenUtility.StartPositionFEN);
 		}
 		else if (message.ToLower().Contains("fen")) {
-			string customFen = TryGetLabelledValue(message, "fen", positionLabels);
-			player.SetPosition(customFen);
+			var customFen = TryGetLabelledValue(message, "fen", positionLabels);
+			engine.SetPosition(customFen);
 		}
 		else
 		{
@@ -107,17 +106,17 @@ public class EngineUCI
 		}
 
 		// Moves
-		string allMoves = TryGetLabelledValue(message, "moves", positionLabels);
-		if (!string.IsNullOrEmpty(allMoves))
+		var allMoves = TryGetLabelledValue(message, "moves", positionLabels);
+		if (string.IsNullOrEmpty(allMoves))
+			return;
+		
+		var moveList = allMoves.Split(' ');
+		foreach (var move in moveList)
 		{
-			string[] moveList = allMoves.Split(' ');
-			foreach (string move in moveList)
-			{
-				player.MakeMove(move);
-			}
-
-			LogToFile($"Make moves after setting position: {moveList.Length}");
+			engine.MakeMove(move);
 		}
+
+		LogToFile($"Make moves after setting position: {moveList.Length}");
 	}
 
 	void Respond(string reponse)
@@ -128,8 +127,8 @@ public class EngineUCI
 
 	static int TryGetLabelledValueInt(string text, string label, string[] allLabels, int defaultValue = 0)
 	{
-		string valueString = TryGetLabelledValue(text, label, allLabels, defaultValue + "");
-		if (int.TryParse(valueString.Split(' ')[0], out int result))
+		var valueString = TryGetLabelledValue(text, label, allLabels, defaultValue + "");
+		if (int.TryParse(valueString.Split(' ')[0], out var result))
 		{
 			return result;
 		}
@@ -141,13 +140,13 @@ public class EngineUCI
 		text = text.Trim();
 		if (text.Contains(label))
 		{
-			int valueStart = text.IndexOf(label) + label.Length;
-			int valueEnd = text.Length;
-			foreach (string otherID in allLabels)
+			var valueStart = text.IndexOf(label) + label.Length;
+			var valueEnd = text.Length;
+			foreach (var otherID in allLabels)
 			{
 				if (otherID != label && text.Contains(otherID))
 				{
-					int otherIDStartIndex = text.IndexOf(otherID);
+					var otherIDStartIndex = text.IndexOf(otherID);
 					if (otherIDStartIndex > valueStart && otherIDStartIndex < valueEnd)
 					{
 						valueEnd = otherIDStartIndex;
@@ -162,25 +161,21 @@ public class EngineUCI
 
 	void LogToFile(string text)
 	{
-		if (logToFile)
-		{
-			Directory.CreateDirectory(AppDataPath);
-			string path = Path.Combine(AppDataPath, "UCI_Log.txt");
-
-			using (StreamWriter writer = new StreamWriter(path, true))
-			{
-				writer.WriteLine(text);
-			}
-		}
+		if (!logToFile)
+			return;
+		
+		Directory.CreateDirectory(AppDataPath);
+		var path = Path.Combine(AppDataPath, "UCI_Log.txt");
+		using var writer = new StreamWriter(path, true);
+		writer.WriteLine(text);
 	}
 
 	public static string AppDataPath
 	{
 		get
 		{
-			string dir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+			var dir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 			return Path.Combine(dir, "Chess-Coding-Adventure");
 		}
 	}
-
 }

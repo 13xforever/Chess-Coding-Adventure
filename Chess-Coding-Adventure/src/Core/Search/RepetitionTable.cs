@@ -1,62 +1,61 @@
 using System;
 using System.Linq;
 
-namespace Chess.Core
+namespace Chess.Core;
+
+public class RepetitionTable
 {
-	public class RepetitionTable
+	readonly ulong[] hashes;
+	readonly int[] startIndices;
+	int count;
+
+	public RepetitionTable()
 	{
-		readonly ulong[] hashes;
-		readonly int[] startIndices;
-		int count;
+		hashes = new ulong[256];
+		startIndices = new int[hashes.Length + 1];
+	}
 
-		public RepetitionTable()
+	public void Init(Board board)
+	{
+		var initialHashes = board.RepetitionPositionHistory.Reverse().ToArray();
+		count = initialHashes.Length;
+
+		for (var i = 0; i < initialHashes.Length; i++)
 		{
-			hashes = new ulong[256];
-			startIndices = new int[hashes.Length + 1];
+			hashes[i] = initialHashes[i];
+			startIndices[i] = 0;
 		}
+		startIndices[count] = 0;
+	}
 
-		public void Init(Board board)
+
+	public void Push(ulong hash, bool reset)
+	{
+		// Check bounds just in case
+		if (count < hashes.Length)
 		{
-			ulong[] initialHashes = board.RepetitionPositionHistory.Reverse().ToArray();
-			count = initialHashes.Length;
+			hashes[count] = hash;
+			startIndices[count + 1] = reset ? count : startIndices[count];
+		}
+		count++;
+	}
 
-			for (int i = 0; i < initialHashes.Length; i++)
+	public void TryPop()
+	{
+		count = Math.Max(0, count - 1);
+	}
+
+	public bool Contains(ulong h)
+	{
+		var s = startIndices[count];
+		// up to count-1 so that curr position is not counted
+		for (var i = s; i < count - 1; i++)
+		{
+			if (hashes[i] == h)
 			{
-				hashes[i] = initialHashes[i];
-				startIndices[i] = 0;
+				return true;
 			}
-			startIndices[count] = 0;
 		}
-
-
-		public void Push(ulong hash, bool reset)
-		{
-			// Check bounds just in case
-			if (count < hashes.Length)
-			{
-				hashes[count] = hash;
-				startIndices[count + 1] = reset ? count : startIndices[count];
-			}
-			count++;
-		}
-
-		public void TryPop()
-		{
-			count = Math.Max(0, count - 1);
-		}
-
-		public bool Contains(ulong h)
-		{
-			int s = startIndices[count];
-			// up to count-1 so that curr position is not counted
-			for (int i = s; i < count - 1; i++)
-			{
-				if (hashes[i] == h)
-				{
-					return true;
-				}
-			}
-			return false;
-		}
+		return false;
 	}
 }

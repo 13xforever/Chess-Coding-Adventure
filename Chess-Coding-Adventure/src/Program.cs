@@ -1,21 +1,18 @@
-﻿namespace CodingAdventureBot;
-using Chess.Core;
-using System;
-using System.Collections.Generic;
+﻿using System;
+
+namespace CodingAdventureBot;
 
 public static class Program
 {
     public static void Main(string[] args)
     {
         EngineUCI engine = new();
-
-        string command = String.Empty;
+        var command = "";
         while (command != "quit")
         {
             command = Console.ReadLine();
-            engine.ReceiveCommand(command);
+            if (!string.IsNullOrEmpty(command))
+                engine.ReceiveCommand(command);
         }
-
     }
-
 }

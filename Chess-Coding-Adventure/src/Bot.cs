@@ -36,10 +36,10 @@ public class Bot
 	public Bot()
 	{
 		board = Board.CreateBoard();
-		searcher = new Searcher(board);
+		searcher = new(board);
 		searcher.OnSearchComplete += OnSearchComplete;
 
-		book = new OpeningBook(Chess_Coding_Adventure.Properties.Resources.Book);
+		book = new(Chess_Coding_Adventure.Properties.Resources.Book);
 		searchWaitHandle = new(false);
 
 		Task.Factory.StartNew(SearchThread, TaskCreationOptions.LongRunning);
@@ -57,16 +57,16 @@ public class Bot
 
 	public void MakeMove(string moveString)
 	{
-		Move move = MoveUtility.GetMoveFromUCIName(moveString, board);
+		var move = MoveUtility.GetMoveFromUCIName(moveString, board);
 		board.MakeMove(move);
 	}
 
 	public int ChooseThinkTime(int timeRemainingWhiteMs, int timeRemainingBlackMs, int incrementWhiteMs, int incrementBlackMs)
 	{
-		int myTimeRemainingMs = board.IsWhiteToMove ? timeRemainingWhiteMs : timeRemainingBlackMs;
-		int myIncrementMs = board.IsWhiteToMove ? incrementWhiteMs : incrementBlackMs;
+		var myTimeRemainingMs = board.IsWhiteToMove ? timeRemainingWhiteMs : timeRemainingBlackMs;
+		var myIncrementMs = board.IsWhiteToMove ? incrementWhiteMs : incrementBlackMs;
 		// Get a fraction of remaining time to use for current move
-		double thinkTimeMs = myTimeRemainingMs / 40.0;
+		var thinkTimeMs = myTimeRemainingMs / 40.0;
 		// Clamp think time if a maximum limit is imposed
 		if (useMaxThinkTime)
 		{
@@ -78,7 +78,7 @@ public class Bot
 			thinkTimeMs += myIncrementMs * 0.8;
 		}
 
-		double minThinkTime = Min(50, myTimeRemainingMs * 0.25);
+		var minThinkTime = Min(50, myTimeRemainingMs * 0.25);
 		return (int)Ceiling(Max(minThinkTime, thinkTimeMs));
 	}
 
@@ -88,7 +88,7 @@ public class Bot
 		IsThinking = true;
 		cancelSearchTimer?.Cancel();
 
-		if (TryGetOpeningBookMove(out Move bookMove))
+		if (TryGetOpeningBookMove(out var bookMove))
 		{
 			LatestMoveIsBookMove = true;
 			OnSearchComplete(bookMove);
@@ -103,7 +103,7 @@ public class Bot
 	{
 		currentSearchID++;
 		searchWaitHandle.Set();
-		cancelSearchTimer = new CancellationTokenSource();
+		cancelSearchTimer = new();
 		Task.Delay(timeMs, cancelSearchTimer.Token).ContinueWith((t) => EndSearch(currentSearchID));
 	}
 
@@ -141,7 +141,7 @@ public class Bot
 	void EndSearch(int searchID)
 	{
 		// If search timer has been cancelled, the search will have been stopped already
-		if (cancelSearchTimer != null && cancelSearchTimer.IsCancellationRequested)
+		if (cancelSearchTimer is { IsCancellationRequested: true })
 		{
 			return;
 		}
@@ -156,14 +156,14 @@ public class Bot
 	{
 		IsThinking = false;
 
-		string moveName = MoveUtility.GetMoveNameUCI(move).Replace("=", "");
+		var moveName = MoveUtility.GetMoveNameUCI(move).Replace("=", "");
 
 		OnMoveChosen?.Invoke(moveName);
 	}
 
 	bool TryGetOpeningBookMove(out Move bookMove)
 	{
-		if (useOpeningBook && board.PlyCount <= maxBookPly && book.TryGetBookMove(board, out string moveString))
+		if (useOpeningBook && board.PlyCount <= maxBookPly && book.TryGetBookMove(board, out var moveString))
 		{
 			bookMove = MoveUtility.GetMoveFromUCIName(moveString, board);
 			return true;
