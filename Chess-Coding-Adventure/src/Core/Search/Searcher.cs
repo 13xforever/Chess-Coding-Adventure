@@ -11,7 +11,9 @@ namespace Chess.Core;
 public class Searcher
 {
 	// Constants
-	private const int transpositionTableSizeMB = 256;
+	public const int DefaultTranspositionTableSizeMB = 256;
+	public static readonly int MaxTranspositionTableSizeMB = Array.MaxLength / 1024 / 1024;
+	private readonly int transpositionTableSizeMB;
 	private const int maxExtentions = 16;
 
 	private const int immediateMateScore = 100000;
@@ -52,9 +54,10 @@ public class Searcher
 	private readonly Evaluation evaluation;
 	private readonly Board board;
 
-	public Searcher(Board board)
+	public Searcher(Board board, int hashSize)
 	{
 		this.board = board;
+		transpositionTableSizeMB = hashSize;
 
 		evaluation = new();
 		moveGenerator = new();
@@ -85,7 +88,7 @@ public class Searcher
 		searchCancelled = false;
 		searchDiagnostics = new();
 		searchIterationTimer = new();
-		searchTotalTimer = System.Diagnostics.Stopwatch.StartNew();
+		searchTotalTimer = Stopwatch.StartNew();
 
 		// Search
 		RunIterativeDeepeningSearch();

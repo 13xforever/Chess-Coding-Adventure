@@ -1,5 +1,6 @@
 ﻿using Chess.Core;
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace CodingAdventureBot;
@@ -7,66 +8,138 @@ namespace CodingAdventureBot;
 // Specification download: https://www.shredderchess.com/download.html
 public class EngineUCI
 {
-	private readonly Bot engine;
+	private Bot? engine = null;
 	private static readonly bool logToFile = false;
 
 	private static readonly string[] positionLabels = ["position", "fen", "moves"];
 	private static readonly string[] goLabels = ["go", "movetime", "wtime", "btime", "winc", "binc", "movestogo"];
+	private static readonly char[] whitespaces = [' ', '\t'];
+	private readonly Dictionary<string, string> options;
 
 	public EngineUCI()
 	{
-		engine = new();
-		engine.OnMoveChosen += OnMoveChosen;
-		engine.OnInfo += s => Respond("info " + s);
+		options = new(StringComparer.OrdinalIgnoreCase)
+		{
+			[Options.HashSize] = Searcher.DefaultTranspositionTableSizeMB.ToString(),
+		};
 	}
 
 	public void ReceiveCommand(string message)
 	{
-		//Console.WriteLine(message);
+		if (string.IsNullOrWhiteSpace(message))
+			return;
+
 		LogToFile("Command received: " + message);
-		message = message.Trim();
-		var messageType = message.Split(' ')[0].ToLower();
-		switch (messageType)
+		Span<string> messageParts = message.Trim().Split(whitespaces, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+		if (messageParts.Length is 0)
+			return;
+parse:
+		switch (messageParts[0].ToLower())
 		{
 			case "uci":
-				Respond("id name Coding Adventure 2.0");
+				Respond("id name Coding Adventure 2.1");
 				Respond("id author Sebastian Lague");
 				Respond("option name UCI_EngineAbout type string default Chess Coding Adventure Bot by Sebastian Lague. See https://github.com/SebLague/Chess-Coding-Adventure for details.");
+				Respond($"option name {Options.HashSize} type spin default {options[Options.HashSize]} min 1 max {Searcher.MaxTranspositionTableSizeMB}");
 				Respond("uciok");
 				break;
 			case "isready":
+				CreateEngineIfNeeded();
 				Respond("readyok");
 				break;
 			case "ucinewgame":
-				engine.NotifyNewGame();
+				CreateEngineIfNeeded();
+				engine!.NotifyNewGame();
 				break;
 			case "position":
+				CreateEngineIfNeeded();
 				ProcessPositionCommand(message);
 				break;
 			case "go":
+				CreateEngineIfNeeded();
 				ProcessGoCommand(message);
 				break;
 			case "stop":
-				if (engine.IsThinking)
+				if (engine is {IsThinking: true})
 				{
 					engine.StopThinking();
 				}
 				break;
 			case "quit":
-				engine.Quit();
+				engine?.Quit();
 				break;
 			case "d":
-				Console.WriteLine(engine.GetBoardDiagram());
+				if (engine is null)
+					Console.WriteLine("engine is not created yet");
+				else
+					Console.WriteLine(engine.GetBoardDiagram());
+				break;
+			case "setoption":
+				var (name, value) = GetOptionValue(messageParts[1..]);
+				if (options.ContainsKey(name))
+				{
+					options[name] = value;
+					LogToFile($"Set {name} = {value}");
+				}
+				else
+					LogToFile($"Unknown option {name}");
 				break;
 			default:
-				LogToFile($"Unrecognized command: {messageType}");
+				if (messageParts.Length is 1)
+					LogToFile($"Unrecognized command: {message}");
+				else
+				{
+					messageParts = messageParts[1..];
+					goto parse;
+				}
 				break;
 		}
 	}
 
+	private void CreateEngineIfNeeded()
+	{
+		if (engine is not null)
+			return;
+
+		if (!options.TryGetValue(Options.HashSize, out var hashSizeStr)
+		    || !int.TryParse(hashSizeStr, out var hashSize)
+		    || hashSize < 1 || hashSize > Searcher.MaxTranspositionTableSizeMB)
+			hashSize = Searcher.DefaultTranspositionTableSizeMB;
+		engine = new(hashSize);
+		engine.OnMoveChosen += OnMoveChosen;
+		engine.OnInfo += s => Respond("info " + s);
+	}
+
+	private static (string name, string value) GetOptionValue(ReadOnlySpan<string> messageParts)
+	{
+		string name = "", value = "";
+		var state = 0; // 0 = unknown, 1 = name, 2 = value
+		
+		while (messageParts is [{} part, ..])
+		{
+			switch (state, part)
+			{
+				case (_,"name"):
+					state = 1;
+					break;
+				case (_, "value"):
+					state = 2;
+					break;
+				case (1, _):
+					name += part + " ";
+					break;
+				case (2, _):
+					value += part + " ";
+					break;
+			}
+			messageParts = messageParts[1..];
+		}
+		return (name.TrimEnd(), value.TrimEnd());
+	}
+	
 	private void OnMoveChosen(string move)
 	{
-		LogToFile("OnMoveChosen: book move = " + engine.LatestMoveIsBookMove);
+		LogToFile("OnMoveChosen: book move = " + engine!.LatestMoveIsBookMove);
 		Respond("bestmove " + move);
 	}
 
@@ -75,7 +148,7 @@ public class EngineUCI
 		if (message.Contains("movetime"))
 		{
 			var moveTimeMs = TryGetLabelledValueInt(message, "movetime", goLabels, 0);
-			engine.ThinkTimed(moveTimeMs);
+			engine!.ThinkTimed(moveTimeMs);
 		}
 		else
 		{
@@ -84,7 +157,7 @@ public class EngineUCI
 			var incrementWhiteMs = TryGetLabelledValueInt(message, "winc", goLabels, 0);
 			var incrementBlackMs = TryGetLabelledValueInt(message, "binc", goLabels, 0);
 
-			var thinkTime = engine.ChooseThinkTime(timeRemainingWhiteMs, timeRemainingBlackMs, incrementWhiteMs, incrementBlackMs);
+			var thinkTime = engine!.ChooseThinkTime(timeRemainingWhiteMs, timeRemainingBlackMs, incrementWhiteMs, incrementBlackMs);
 			LogToFile("Thinking for: " + thinkTime + " ms.");
 			engine.ThinkTimed(thinkTime);
 		}
@@ -99,11 +172,11 @@ public class EngineUCI
 		// FEN
 		if (message.ToLower().Contains("startpos"))
 		{
-			engine.SetPosition(FenUtility.StartPositionFEN);
+			engine!.SetPosition(FenUtility.StartPositionFEN);
 		}
 		else if (message.ToLower().Contains("fen")) {
 			var customFen = TryGetLabelledValue(message, "fen", positionLabels);
-			engine.SetPosition(customFen);
+			engine!.SetPosition(customFen);
 		}
 		else
 		{
@@ -118,7 +191,7 @@ public class EngineUCI
 		var moveList = allMoves.Split(' ');
 		foreach (var move in moveList)
 		{
-			engine.MakeMove(move);
+			engine!.MakeMove(move);
 		}
 
 		LogToFile($"Make moves after setting position: {moveList.Length}");

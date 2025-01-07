@@ -35,10 +35,10 @@ public class Bot
 	private int currentSearchID;
 	private bool isQuitting;
 
-	public Bot()
+	public Bot(int hashSize)
 	{
 		board = Board.CreateBoard();
-		searcher = new(board);
+		searcher = new(board, hashSize);
 		searcher.OnSearchComplete += OnSearchComplete;
 		searcher.OnInfo += s => OnInfo?.Invoke(s);
 
