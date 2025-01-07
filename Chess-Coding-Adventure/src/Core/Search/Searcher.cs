@@ -141,7 +141,7 @@ public class Searcher
 					selDepth = $"seldepth {maxDepth}";
 				var score = $"cp {curEval}";
 				if (IsMateScore(curEval))
-					score = $"mate {(int)Ceiling(NumPlyToMateFromScore(curEval) / 2.0)}";
+					score = $"mate {(curEval < 0 ? "-": "")}{(int)Ceiling(NumPlyToMateFromScore(curEval) / 2.0)}";
 				var nps = (int)((nodeCount - lastNodeCount) / timer.Elapsed.TotalSeconds);
 				var moveList = GetBestMoveChain(bestMoveThisIteration, currentIterationDepth);
 				var pv = moveList.Count > 0
