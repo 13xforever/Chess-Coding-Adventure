@@ -1,5 +1,5 @@
 # Chess-Coding-Adventure
-Version 2.0 of the Coding Adventure Bot. Good at beating up humans (~2600 on [lichess](https://lichess.org/@/CodingAdventureBot/playing)), but still has a very long way to go against its fellow machines (Stockfish crushes it even with rook-odds!)
+Version 2.0 of the Coding Adventure Bot. Good at beating up humans (~2200 on [lichess](https://lichess.org/@/CodingAdventureBot/playing)), but still has a very long way to go against its fellow machines (Stockfish crushes it even with rook-odds!)
 
 You can find some videos about the bot's creation process here: [V1](https://www.youtube.com/watch?v=U4ogK0MIzqk) and [V2](https://youtu.be/_vqlIPDR2TU)
 
@@ -10,5 +10,5 @@ A copy of specification is provided in [UCI Specification.md](UCI%20Specificatio
 
 # Changes from upstream
 * Upgraded solution to .NET 9
-* Expanded UCI command implementation, including some basic engine info reporting
+* Expanded UCI command implementation, including some basic options and engine info reporting
 * Minor code fixes and optimizations
