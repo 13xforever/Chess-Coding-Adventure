@@ -21,6 +21,7 @@ public class EngineUCI
 		options = new(StringComparer.OrdinalIgnoreCase)
 		{
 			[Options.HashSize] = Searcher.DefaultTranspositionTableSizeMB.ToString(),
+			[Options.Ponder] = "false",
 		};
 	}
 
@@ -37,10 +38,11 @@ parse:
 		switch (messageParts[0].ToLower())
 		{
 			case "uci":
-				Respond("id name Coding Adventure 2.1");
+				Respond("id name Coding Adventure 2.2");
 				Respond("id author Sebastian Lague");
 				Respond("option name UCI_EngineAbout type string default Chess Coding Adventure Bot by Sebastian Lague. See https://github.com/SebLague/Chess-Coding-Adventure for details.");
 				Respond($"option name {Options.HashSize} type spin default {options[Options.HashSize]} min 1 max {Searcher.MaxTranspositionTableSizeMB}");
+				Respond($"option name {Options.Ponder} type check default {options[Options.Ponder]}");
 				Respond("uciok");
 				break;
 			case "isready":
@@ -59,10 +61,15 @@ parse:
 				CreateEngineIfNeeded();
 				ProcessGoCommand(message);
 				break;
+			case "ponderhit":
+				if (engine is { IsThinking: true })
+					engine.StopThinking(true);
+				engine!.PonderHit();
+				break;
 			case "stop":
 				if (engine is {IsThinking: true})
 				{
-					engine.StopThinking();
+					engine.StopThinking(false);
 				}
 				break;
 			case "quit":
@@ -70,9 +77,12 @@ parse:
 				break;
 			case "d":
 				if (engine is null)
-					Console.WriteLine("engine is not created yet");
+					Respond("info string Engine is not created yet");
 				else
-					Console.WriteLine(engine.GetBoardDiagram());
+				{
+					//Console.WriteLine(engine.GetBoardDiagram());
+					Respond($"info string Pondering={engine.IsPondering}, thinking={engine.IsThinking}");
+				}
 				break;
 			case "setoption":
 				var (name, value) = GetOptionValue(messageParts[1..]);
@@ -105,7 +115,10 @@ parse:
 		    || !int.TryParse(hashSizeStr, out var hashSize)
 		    || hashSize < 1 || hashSize > Searcher.MaxTranspositionTableSizeMB)
 			hashSize = Searcher.DefaultTranspositionTableSizeMB;
-		engine = new(hashSize);
+		if (!options.TryGetValue(Options.Ponder, out var ponderStr)
+		    || !bool.TryParse(ponderStr, out var canPonder))
+			canPonder = false;
+		engine = new(hashSize, canPonder);
 		engine.OnMoveChosen += OnMoveChosen;
 		engine.OnInfo += s => Respond("info " + s);
 	}
@@ -137,15 +150,27 @@ parse:
 		return (name.TrimEnd(), value.TrimEnd());
 	}
 	
-	private void OnMoveChosen(string move)
+	private void OnMoveChosen(string move, string? ponderMove)
 	{
-		LogToFile("OnMoveChosen: book move = " + engine!.LatestMoveIsBookMove);
-		Respond("bestmove " + move);
+		if (engine!.IsPonderHit)
+			return;
+		
+		LogToFile($"{nameof(OnMoveChosen)}: book move = {engine.LatestMoveIsBookMove}");
+		var bestmove = "bestmove " + move;
+		if (ponderMove is { Length: > 0 })
+			bestmove += $" ponder {ponderMove}";
+		Respond(bestmove);
 	}
 
 	private void ProcessGoCommand(string message)
 	{
-		if (message.Contains("movetime"))
+		var isPonder = message.Contains("ponder");
+		var thinkTime = -1;
+		if (message.Contains("infinite"))
+		{
+			engine!.ThinkTimed(-1);
+		}
+		else if (message.Contains("movetime"))
 		{
 			var moveTimeMs = TryGetLabelledValueInt(message, "movetime", goLabels, 0);
 			engine!.ThinkTimed(moveTimeMs);
@@ -157,24 +182,26 @@ parse:
 			var incrementWhiteMs = TryGetLabelledValueInt(message, "winc", goLabels, 0);
 			var incrementBlackMs = TryGetLabelledValueInt(message, "binc", goLabels, 0);
 
-			var thinkTime = engine!.ChooseThinkTime(timeRemainingWhiteMs, timeRemainingBlackMs, incrementWhiteMs, incrementBlackMs);
-			LogToFile("Thinking for: " + thinkTime + " ms.");
-			engine.ThinkTimed(thinkTime);
+			thinkTime = engine!.ChooseThinkTime(timeRemainingWhiteMs, timeRemainingBlackMs, incrementWhiteMs, incrementBlackMs);
 		}
-
+		LogToFile("Thinking for: " + thinkTime + " ms.");
+		if (isPonder)
+			engine.Ponder(thinkTime);
+		else
+			engine.ThinkTimed(thinkTime);
 	}
 
 	// Format: 'position startpos moves e2e4 e7e5'
 	// Or: 'position fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 moves e2e4 e7e5'
-	// Note: 'moves' section is optional
+	// Note: 'moves' section is optional; last move is the suggested ponder move for 'go ponder' command
 	private void ProcessPositionCommand(string message)
 	{
 		// FEN
-		if (message.ToLower().Contains("startpos"))
+		if (message.Contains("startpos", StringComparison.CurrentCultureIgnoreCase))
 		{
 			engine!.SetPosition(FenUtility.StartPositionFEN);
 		}
-		else if (message.ToLower().Contains("fen")) {
+		else if (message.Contains("fen", StringComparison.CurrentCultureIgnoreCase)) {
 			var customFen = TryGetLabelledValue(message, "fen", positionLabels);
 			engine!.SetPosition(customFen);
 		}

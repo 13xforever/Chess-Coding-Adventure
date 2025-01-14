@@ -19,9 +19,11 @@ public class Bot
 	private const int maxThinkTimeMs = 2500;
 
 	// Public stuff
-	public event Action<string>? OnMoveChosen;
+	public event Action<string, string?>? OnMoveChosen;
 	public event Action<string>? OnInfo;
 	public bool IsThinking { get; private set; }
+	public bool IsPondering { get; private set; }
+	public bool IsPonderHit { get; private set; }
 	public bool LatestMoveIsBookMove { get; private set; }
 
 	// References
@@ -34,11 +36,14 @@ public class Bot
 	// State
 	private int currentSearchID;
 	private bool isQuitting;
+	private Move lastMove = Move.NullMove;
+	private int thinkTimeAfterPonder;
+	private string boardPositionForPondering;
 
-	public Bot(int hashSize)
+	public Bot(int hashSize, bool canPonder)
 	{
 		board = Board.CreateBoard();
-		searcher = new(board, hashSize);
+		searcher = new(board, hashSize, canPonder);
 		searcher.OnSearchComplete += OnSearchComplete;
 		searcher.OnInfo += s => OnInfo?.Invoke(s);
 
@@ -60,8 +65,8 @@ public class Bot
 
 	public void MakeMove(string moveString)
 	{
-		var move = MoveUtility.GetMoveFromUCIName(moveString, board);
-		board.MakeMove(move);
+		lastMove = MoveUtility.GetMoveFromUCIName(moveString, board);
+		board.MakeMove(lastMove);
 	}
 
 	public int ChooseThinkTime(int timeRemainingWhiteMs, int timeRemainingBlackMs, int incrementWhiteMs, int incrementBlackMs)
@@ -89,12 +94,14 @@ public class Bot
 	{
 		LatestMoveIsBookMove = false;
 		IsThinking = true;
+		lastMove = Move.NullMove;
 		cancelSearchTimer?.Cancel();
-
+		IsPondering = false;
+		IsPonderHit = false;
 		if (TryGetOpeningBookMove(out var bookMove))
 		{
 			LatestMoveIsBookMove = true;
-			OnSearchComplete(bookMove);
+			OnSearchComplete(bookMove, Move.NullMove);
 		}
 		else
 		{
@@ -102,10 +109,34 @@ public class Bot
 		}
 	}
 
+	public void Ponder(int thinkTimeMs)
+	{
+		board.UnmakeMove(lastMove);
+		boardPositionForPondering = board.CurrentFEN;
+		thinkTimeAfterPonder = thinkTimeMs;
+		searcher.PonderMove = lastMove;
+		LatestMoveIsBookMove = false;
+		IsThinking = true;
+		IsPondering = true;
+		cancelSearchTimer?.Cancel();
+		StartSearch(-1);
+	}
+	
+	public void PonderHit()
+	{
+		IsPonderHit = true;
+		IsPondering = false;
+		board.LoadPosition(boardPositionForPondering);
+		board.MakeMove(lastMove);
+		ThinkTimed(thinkTimeAfterPonder);
+	}
+
 	private void StartSearch(int timeMs)
 	{
+		searcher.IsPondering = IsPondering;
 		currentSearchID++;
 		searchWaitHandle.Set();
+		cancelSearchTimer?.Dispose();
 		cancelSearchTimer = new();
 		Task.Delay(timeMs, cancelSearchTimer.Token).ContinueWith((t) => EndSearch(currentSearchID));
 	}
@@ -119,8 +150,11 @@ public class Bot
 		}
 	}
 
-	public void StopThinking()
+	public void StopThinking(bool isPonderhit)
 	{
+		IsPonderHit = isPonderhit;
+		if (!isPonderhit)
+			IsPondering = false;
 		EndSearch();
 	}
 
@@ -139,6 +173,8 @@ public class Bot
 		{
 			searcher.EndSearch();
 		}
+		searcher.searchSemaphore.Wait();
+		searcher.searchSemaphore.Release();
 	}
 
 	private void EndSearch(int searchID)
@@ -155,13 +191,17 @@ public class Bot
 		}
 	}
 
-	private void OnSearchComplete(Move move)
+	private void OnSearchComplete(Move move, Move ponderMove)
 	{
 		IsThinking = false;
-
-		var moveName = MoveUtility.GetMoveNameUCI(move).Replace("=", "");
-
-		OnMoveChosen?.Invoke(moveName);
+		if (IsPonderHit)
+			return;
+		
+		var moveName = MoveUtility.GetMoveNameUCI(move);
+		string? ponderName = null;
+		if (!ponderMove.IsNull)
+			ponderName = MoveUtility.GetMoveNameUCI(ponderMove);
+		OnMoveChosen?.Invoke(moveName, ponderName);
 	}
 
 	private bool TryGetOpeningBookMove(out Move bookMove)

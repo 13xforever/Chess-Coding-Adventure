@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using CodingAdventureBot;
 
 namespace Chess.Core;
@@ -56,7 +57,7 @@ public sealed class Board
 	public string CurrentFEN => FenUtility.CurrentFen(this);
 	public string GameStartFEN => StartPositionInfo.fen;
 	public List<Move> AllGameMoves;
-
+	public readonly Lock Lock = new();
 
 	// # Private stuff
 	private PieceList[] allPieceLists;
@@ -452,56 +453,61 @@ public sealed class Board
 
 	public void LoadPosition(FenUtility.PositionInfo posInfo)
 	{
-		StartPositionInfo = posInfo;
-		Initialize();
-
-		// Load pieces into board array and piece lists
-		for (var squareIndex = 0; squareIndex < 64; squareIndex++)
+		lock (Lock)
 		{
-			var piece = posInfo.squares[squareIndex];
-			var pieceType = Piece.PieceType(piece);
-			var colourIndex = Piece.IsWhite(piece) ? WhiteIndex : BlackIndex;
-			Square[squareIndex] = piece;
+			StartPositionInfo = posInfo;
+			Initialize();
 
-			if (piece != Piece.None)
+			// Load pieces into board array and piece lists
+			for (var squareIndex = 0; squareIndex < 64; squareIndex++)
 			{
-				BitBoardUtility.SetSquare(ref PieceBitboards[piece], squareIndex);
-				BitBoardUtility.SetSquare(ref ColourBitboards[colourIndex], squareIndex);
+				var piece = posInfo.squares[squareIndex];
+				var pieceType = Piece.PieceType(piece);
+				var colourIndex = Piece.IsWhite(piece) ? WhiteIndex : BlackIndex;
+				Square[squareIndex] = piece;
 
-				if (pieceType == Piece.King)
+				if (piece != Piece.None)
 				{
-					KingSquare[colourIndex] = squareIndex;
+					BitBoardUtility.SetSquare(ref PieceBitboards[piece], squareIndex);
+					BitBoardUtility.SetSquare(ref ColourBitboards[colourIndex], squareIndex);
+
+					if (pieceType == Piece.King)
+					{
+						KingSquare[colourIndex] = squareIndex;
+					}
+					else
+					{
+						allPieceLists[piece].AddPieceAtSquare(squareIndex);
+					}
+					TotalPieceCountWithoutPawnsAndKings += pieceType is Piece.Pawn or Piece.King ? 0 : 1;
 				}
-				else
-				{
-					allPieceLists[piece].AddPieceAtSquare(squareIndex);
-				}
-				TotalPieceCountWithoutPawnsAndKings += (pieceType is Piece.Pawn or Piece.King) ? 0 : 1;
 			}
+
+			// Side to move
+			IsWhiteToMove = posInfo.whiteToMove;
+
+			// Set extra bitboards
+			AllPiecesBitboard = ColourBitboards[WhiteIndex] | ColourBitboards[BlackIndex];
+			UpdateSliderBitboards();
+
+			// Create gamestate
+			var whiteCastle = (posInfo.whiteCastleKingside ? 1 << 0 : 0)
+			                  | (posInfo.whiteCastleQueenside ? 1 << 1 : 0);
+			var blackCastle = (posInfo.blackCastleKingside ? 1 << 2 : 0)
+			                  | (posInfo.blackCastleQueenside ? 1 << 3 : 0);
+			var castlingRights = whiteCastle | blackCastle;
+
+			PlyCount = (posInfo.moveCount - 1) * 2 + (IsWhiteToMove ? 0 : 1);
+
+			// Set game state (note: calculating zobrist key relies on current game state)
+			CurrentGameState = new(Piece.None, posInfo.epFile, castlingRights, posInfo.fiftyMovePlyCount, 0);
+			var zobristKey = Zobrist.CalculateZobristKey(this);
+			CurrentGameState = new(Piece.None, posInfo.epFile, castlingRights, posInfo.fiftyMovePlyCount, zobristKey);
+
+			RepetitionPositionHistory.Push(zobristKey);
+
+			gameStateHistory.Push(CurrentGameState);
 		}
-
-		// Side to move
-		IsWhiteToMove = posInfo.whiteToMove;
-
-		// Set extra bitboards
-		AllPiecesBitboard = ColourBitboards[WhiteIndex] | ColourBitboards[BlackIndex];
-		UpdateSliderBitboards();
-
-		// Create gamestate
-		var whiteCastle = ((posInfo.whiteCastleKingside) ? 1 << 0 : 0) | ((posInfo.whiteCastleQueenside) ? 1 << 1 : 0);
-		var blackCastle = ((posInfo.blackCastleKingside) ? 1 << 2 : 0) | ((posInfo.blackCastleQueenside) ? 1 << 3 : 0);
-		var castlingRights = whiteCastle | blackCastle;
-
-		PlyCount = (posInfo.moveCount - 1) * 2 + (IsWhiteToMove ? 0 : 1);
-
-		// Set game state (note: calculating zobrist key relies on current game state)
-		CurrentGameState = new(Piece.None, posInfo.epFile, castlingRights, posInfo.fiftyMovePlyCount, 0);
-		var zobristKey = Zobrist.CalculateZobristKey(this);
-		CurrentGameState = new(Piece.None, posInfo.epFile, castlingRights, posInfo.fiftyMovePlyCount, zobristKey);
-
-		RepetitionPositionHistory.Push(zobristKey);
-
-		gameStateHistory.Push(CurrentGameState);
 	}
 
 	public override string ToString()

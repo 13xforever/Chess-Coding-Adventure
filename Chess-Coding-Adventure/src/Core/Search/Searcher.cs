@@ -14,19 +14,22 @@ public class Searcher
 	public const int DefaultTranspositionTableSizeMB = 256;
 	public static readonly int MaxTranspositionTableSizeMB = Array.MaxLength / 1024 / 1024;
 	private readonly int transpositionTableSizeMB;
+	private readonly bool canPonder;
 	private const int maxExtentions = 16;
 
 	private const int immediateMateScore = 100000;
 	private const int positiveInfinity = 9999999;
 	private const int negativeInfinity = -positiveInfinity;
 
-	public event Action<Move>? OnSearchComplete;
+	public event Action<Move, Move>? OnSearchComplete;
 	public event Action<string>? OnInfo;
 
 	// State
 	public int CurrentDepth;
 	public Move BestMoveSoFar => bestMove;
 	public int BestEvalSoFar => bestEval;
+	public Move PonderMove { get; set; }
+	public bool IsPondering { get; set; }
 	private bool isPlayingWhite;
 	private Move bestMoveThisIteration;
 	private int bestEvalThisIteration;
@@ -35,6 +38,7 @@ public class Searcher
 	private int bestEval;
 	private bool hasSearchedAtLeastOneMove;
 	private bool searchCancelled;
+	public readonly SemaphoreSlim searchSemaphore = new(1, 1);
 
 	private int currMoveNumber, nodeCount, lastNodeCount, maxDepth;
 	private Stopwatch timer = new();
@@ -54,10 +58,11 @@ public class Searcher
 	private readonly Evaluation evaluation;
 	private readonly Board board;
 
-	public Searcher(Board board, int hashSize)
+	public Searcher(Board board, int hashSize, bool canPonder)
 	{
 		this.board = board;
 		transpositionTableSizeMB = hashSize;
+		this.canPonder = canPonder;
 
 		evaluation = new();
 		moveGenerator = new();
@@ -73,35 +78,61 @@ public class Searcher
 
 	public void StartSearch()
 	{
-		// Initialize search
-		bestEvalThisIteration = bestEval = 0;
-		bestMoveThisIteration = bestMove = Move.NullMove;
-
-		isPlayingWhite = board.IsWhiteToMove;
-
-		moveOrderer.ClearHistory();
-		repetitionTable.Init(board);
-
-		// Initialize debug info
-		CurrentDepth = 0;
-		debugInfo = "Starting search with FEN " + FenUtility.CurrentFen(board);
-		searchCancelled = false;
-		searchDiagnostics = new();
-		searchIterationTimer = new();
-		searchTotalTimer = Stopwatch.StartNew();
-
-		// Search
-		RunIterativeDeepeningSearch();
-
-
-		// Finish up
-		// In the unlikely event that the search is cancelled before a best move can be found, take any move
-		if (bestMove.IsNull)
+		searchSemaphore.Wait();
+		try
 		{
-			bestMove = moveGenerator.GenerateMoves(board)[0];
+			// Initialize search
+			bestEvalThisIteration = bestEval = 0;
+			bestMoveThisIteration = bestMove = IsPondering ? PonderMove : Move.NullMove;
+
+			isPlayingWhite = board.IsWhiteToMove;
+
+			moveOrderer.ClearHistory();
+			repetitionTable.Init(board);
+
+			// Initialize debug info
+			CurrentDepth = 0;
+			debugInfo = "Starting search with FEN " + FenUtility.CurrentFen(board);
+			searchCancelled = false;
+			searchDiagnostics = new();
+			searchIterationTimer = new();
+			searchTotalTimer = Stopwatch.StartNew();
+
+			// Search
+			RunIterativeDeepeningSearch();
+
+			// Finish up
+			// In the unlikely event that the search is cancelled before the best move can be found, take any move
+			if (bestMove.IsNull)
+			{
+				bestMove = moveGenerator.GenerateMoves(board)[0];
+			}
+
+			var ponderMove = Move.NullMove;
+			if (!IsPondering && canPonder)
+			{
+				var chain = GetBestMoveChain(bestMove, 1);
+				if (chain.Count > 1)
+					ponderMove = chain[1];
+				else
+				{
+					board.MakeMove(bestMove);
+					var nextMoveList = moveGenerator.GenerateMoves(board);
+					board.UnmakeMove(bestMove);
+					if (nextMoveList is [Move nextMove, ..])
+						ponderMove = nextMove;
+				}
+			}
+			if (IsPondering)
+				OnSearchComplete?.Invoke(ponderMove, Move.NullMove);
+			else
+				OnSearchComplete?.Invoke(bestMove, ponderMove);
+			searchCancelled = false;
 		}
-		OnSearchComplete?.Invoke(bestMove);
-		searchCancelled = false;
+		finally
+		{
+			searchSemaphore.Release();
+		}
 	}
 
 	// Run iterative deepening. This means doing a full search with a depth of 1, then with a depth of 2, and so on.
@@ -136,22 +167,13 @@ public class Searcher
 				var (curEval, curMove) = (bestEvalThisIteration, bestMoveThisIteration);
 				if (curEval == int.MinValue)
 					(curEval, curMove) = (bestEval, bestMove);
-				var curMoveNotation = MoveUtility.GetMoveNameUCI(curMove).Replace("=", "");
-				OnInfo?.Invoke($"currmove {curMoveNotation} currmovenumber {currMoveNumber}");
+				if (!IsPondering)
+				{
+					var curMoveNotation = MoveUtility.GetMoveNameUCI(curMove);
+					OnInfo?.Invoke($"currmove {curMoveNotation} currmovenumber {currMoveNumber}");
+				}
 
-				var selDepth = "";
-				if (maxDepth > currentIterationDepth)
-					selDepth = $"seldepth {maxDepth}";
-				var score = $"cp {curEval}";
-				if (IsMateScore(curEval))
-					score = $"mate {(curEval < 0 ? "-": "")}{(int)Ceiling(NumPlyToMateFromScore(curEval) / 2.0)}";
-				var nps = (int)((nodeCount - lastNodeCount) / timer.Elapsed.TotalSeconds);
-				var moveList = GetBestMoveChain(bestMoveThisIteration, currentIterationDepth);
-				var pv = moveList.Count > 0
-					? string.Join(' ', moveList.Select(MoveUtility.GetMoveNameUCI))
-					: MoveUtility.GetMoveNameUCI(curMove);
-				OnInfo?.Invoke($"depth {currentIterationDepth} {selDepth} time {(int)searchTotalTimer.ElapsedMilliseconds} nodes {nodeCount} nps {nps} score {score} hashfull {transpositionTable.Hashfull} pv {pv}");
-				lastNodeCount = nodeCount;
+				SendInfo(curEval, curMove);
 				timer.Restart();
 			}
 			if (searchCancelled)
@@ -199,32 +221,58 @@ public class Searcher
 		}
 	}
 
+	private void SendInfo(int curEval, Move curMove)
+	{
+		var selDepth = "";
+		if (maxDepth > currentIterationDepth)
+			selDepth = $"seldepth {maxDepth}";
+		var score = $"cp {curEval}";
+		if (IsMateScore(curEval))
+			score = $"mate {(curEval < 0 ? "-": "")}{(int)Ceiling(NumPlyToMateFromScore(curEval) / 2.0)}";
+		var nps = (int)((nodeCount - lastNodeCount) / timer.Elapsed.TotalSeconds);
+		var moveList = GetBestMoveChain(bestMoveThisIteration, currentIterationDepth);
+		var info = $"depth {currentIterationDepth} {selDepth} time {(int)searchTotalTimer.ElapsedMilliseconds} nodes {nodeCount} nps {nps} score {score} hashfull {transpositionTable.Hashfull}";
+		if (!IsPondering
+		    || moveList.Count > 1 && moveList[0] == PonderMove)
+		{
+			var pv = (!IsPondering && moveList.Count > 0) || (IsPondering && moveList.Count > 1)
+				? string.Join(' ', moveList.Skip(IsPondering ? 1 : 0).Select(MoveUtility.GetMoveNameUCI))
+				: MoveUtility.GetMoveNameUCI(curMove);
+			info += $" pv {pv}";
+		}
+		OnInfo?.Invoke(info);
+		lastNodeCount = nodeCount;
+	}
+
 	private List<Move> GetBestMoveChain(Move move, int maxDepth)
 	{
-		var startDiagram = BoardHelper.CreateDiagram(board);
-		var result = new List<Move>();
-		var depth = 0;
-		Span<Move> moves = stackalloc Move[256];
-		do
+		lock (board.Lock)
 		{
-			var tmp = moves;
-			moveGenerator.GenerateMoves(board, ref tmp, capturesOnly: false);
-			if (!tmp.Contains(move))
-				break;
-			
-			result.Add(move);
-			depth++;
-			board.MakeMove(move, true);
-			move = transpositionTable.TryGetStoredMove();
-			if (move == Move.NullMove)
-				break;
-		} while (depth <= maxDepth);
-		foreach (var m in result.AsEnumerable().Reverse())
-			board.UnmakeMove(m, true);
-		var endDiagram = BoardHelper.CreateDiagram(board);
-		if (endDiagram != startDiagram)
-			throw new InvalidOperationException("Corrupted game state");
-		return result;
+			var startDiagram = BoardHelper.CreateDiagram(board);
+			var result = new List<Move>();
+			var depth = 0;
+			Span<Move> moves = stackalloc Move[256];
+			do
+			{
+				var tmp = moves;
+				moveGenerator.GenerateMoves(board, ref tmp, capturesOnly: false);
+				if (!tmp.Contains(move))
+					break;
+
+				result.Add(move);
+				depth++;
+				board.MakeMove(move, true);
+				move = transpositionTable.TryGetStoredMove();
+				if (move == Move.NullMove)
+					break;
+			} while (depth <= maxDepth);
+			foreach (var m in result.AsEnumerable().Reverse())
+				board.UnmakeMove(m, true);
+			var endDiagram = BoardHelper.CreateDiagram(board);
+			if (endDiagram != startDiagram)
+				throw new InvalidOperationException("Corrupted game state");
+			return result;
+		}
 	}
 
 	public (Move move, int eval) GetSearchResult()
