@@ -223,6 +223,8 @@ public class Searcher
 
 	private void SendInfo(int curEval, Move curMove)
 	{
+		if (IsPondering)
+			curEval = -curEval;
 		var selDepth = "";
 		if (maxDepth > currentIterationDepth)
 			selDepth = $"seldepth {maxDepth}";
@@ -263,7 +265,7 @@ public class Searcher
 				depth++;
 				board.MakeMove(move, true);
 				move = transpositionTable.TryGetStoredMove();
-				if (move == Move.NullMove)
+				if (move.IsNull)
 					break;
 			} while (depth <= maxDepth);
 			foreach (var m in result.AsEnumerable().Reverse())
