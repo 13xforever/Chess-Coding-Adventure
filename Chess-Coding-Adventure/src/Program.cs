@@ -12,7 +12,7 @@ public static class Program
         {
             command = Console.ReadLine();
             if (!string.IsNullOrEmpty(command))
-                engine.ReceiveCommand(command);
+                command = engine.ReceiveCommand(command);
         }
     }
 }

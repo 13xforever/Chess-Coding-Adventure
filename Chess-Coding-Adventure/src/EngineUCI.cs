@@ -27,15 +27,15 @@ public class EngineUCI
 		};
 	}
 
-	public void ReceiveCommand(string message)
+	public string ReceiveCommand(string message)
 	{
 		if (string.IsNullOrWhiteSpace(message))
-			return;
+			return "";
 
 		LogToFile("Command received: " + message);
 		Span<string> messageParts = message.Trim().Split(whitespaces, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 		if (messageParts.Length is 0)
-			return;
+			return "";
 parse:
 		switch (messageParts[0].ToLower())
 		{
@@ -46,37 +46,37 @@ parse:
 				Respond($"option name {Options.HashSize} type spin default {options[Options.HashSize]} min 1 max {Searcher.MaxTranspositionTableSizeMB}");
 				Respond($"option name {Options.Ponder} type check default {options[Options.Ponder]}");
 				Respond("uciok");
-				break;
+				return "uci";
 			case "isready":
 				CreateEngineIfNeeded();
 				Respond("readyok");
-				break;
+				return "isready";
 			case "ucinewgame":
 				CreateEngineIfNeeded();
 				engine!.NotifyNewGame();
-				break;
+				return "ucinewgame";
 			case "position":
 				CreateEngineIfNeeded();
 				ProcessPositionCommand(message);
-				break;
+				return "position";
 			case "go":
 				CreateEngineIfNeeded();
 				ProcessGoCommand(message);
-				break;
+				return "go";
 			case "ponderhit":
 				if (engine is { IsThinking: true })
 					engine.StopThinking(true);
 				engine!.PonderHit();
-				break;
+				return "ponderhit";
 			case "stop":
 				if (engine is {IsThinking: true})
 				{
 					engine.StopThinking(false);
 				}
-				break;
+				return "stop";
 			case "quit":
 				engine?.Quit();
-				break;
+				return "quit";
 			case "d":
 				if (engine is null)
 					Respond("info string Engine is not created yet");
@@ -85,7 +85,7 @@ parse:
 					//Console.WriteLine(engine.GetBoardDiagram());
 					Respond($"info string Pondering={engine.IsPondering}, thinking={engine.IsThinking}");
 				}
-				break;
+				return "d";
 			case "setoption":
 				var (name, value) = GetOptionValue(messageParts[1..]);
 				if (options.ContainsKey(name))
@@ -95,7 +95,7 @@ parse:
 				}
 				else
 					LogToFile($"Unknown option {name}");
-				break;
+				return "setoption";
 			default:
 				if (messageParts.Length is 1)
 					LogToFile($"Unrecognized command: {message}");
@@ -104,7 +104,7 @@ parse:
 					messageParts = messageParts[1..];
 					goto parse;
 				}
-				break;
+				return "";
 		}
 	}
 
