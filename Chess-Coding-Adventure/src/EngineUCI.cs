@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 namespace CodingAdventureBot;
 
@@ -15,6 +16,7 @@ public class EngineUCI
 	private static readonly string[] goLabels = ["go", "movetime", "wtime", "btime", "winc", "binc", "movestogo"];
 	private static readonly char[] whitespaces = [' ', '\t'];
 	private readonly Dictionary<string, string> options;
+	private static readonly Lock EngineLock = new();
 
 	public EngineUCI()
 	{
@@ -111,16 +113,22 @@ parse:
 		if (engine is not null)
 			return;
 
-		if (!options.TryGetValue(Options.HashSize, out var hashSizeStr)
-		    || !int.TryParse(hashSizeStr, out var hashSize)
-		    || hashSize < 1 || hashSize > Searcher.MaxTranspositionTableSizeMB)
-			hashSize = Searcher.DefaultTranspositionTableSizeMB;
-		if (!options.TryGetValue(Options.Ponder, out var ponderStr)
-		    || !bool.TryParse(ponderStr, out var canPonder))
-			canPonder = false;
-		engine = new(hashSize, canPonder);
-		engine.OnMoveChosen += OnMoveChosen;
-		engine.OnInfo += s => Respond("info " + s);
+		lock (EngineLock)
+		{
+			if (engine is not null)
+				return;
+			
+			if (!options.TryGetValue(Options.HashSize, out var hashSizeStr)
+			    || !int.TryParse(hashSizeStr, out var hashSize)
+			    || hashSize < 1 || hashSize > Searcher.MaxTranspositionTableSizeMB)
+				hashSize = Searcher.DefaultTranspositionTableSizeMB;
+			if (!options.TryGetValue(Options.Ponder, out var ponderStr)
+			    || !bool.TryParse(ponderStr, out var canPonder))
+				canPonder = false;
+			engine = new(hashSize, canPonder);
+			engine.OnMoveChosen += OnMoveChosen;
+			engine.OnInfo += s => Respond("info " + s);
+		}
 	}
 
 	private static (string name, string value) GetOptionValue(ReadOnlySpan<string> messageParts)
