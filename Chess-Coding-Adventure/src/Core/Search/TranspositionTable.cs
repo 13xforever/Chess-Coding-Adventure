@@ -45,8 +45,8 @@ public class TranspositionTable
 	{
 		this.board = board;
 
-		var desiredTableSizeInBytes = sizeMB * 1024 * 1024;
-		var numEntries = desiredTableSizeInBytes / TtEntrySizeBytes;
+		var desiredTableSizeInBytes = (long)sizeMB * 1024 * 1024;
+		var numEntries = (int)(desiredTableSizeInBytes / TtEntrySizeBytes);
 
 		count = numEntries;
 		entries = new Entry[numEntries];
