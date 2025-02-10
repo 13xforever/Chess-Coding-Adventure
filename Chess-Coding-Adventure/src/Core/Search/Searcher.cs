@@ -39,6 +39,7 @@ public class Searcher
 	private bool hasSearchedAtLeastOneMove;
 	private bool searchCancelled;
 	public readonly SemaphoreSlim searchSemaphore = new(1, 1);
+	public readonly SemaphoreSlim searchInitSemaphore = new(1, 1);
 
 	private int currMoveNumber, nodeCount, lastNodeCount, maxDepth;
 	private Stopwatch timer = new();
@@ -81,6 +82,8 @@ public class Searcher
 		searchSemaphore.Wait();
 		try
 		{
+			searchInitSemaphore.Wait();
+
 			// Initialize search
 			bestEvalThisIteration = bestEval = 0;
 			bestMoveThisIteration = bestMove = IsPondering ? PonderMove : Move.NullMove;
@@ -97,6 +100,7 @@ public class Searcher
 			searchDiagnostics = new();
 			searchIterationTimer = new();
 			searchTotalTimer = Stopwatch.StartNew();
+			searchInitSemaphore.Release();
 
 			// Search
 			RunIterativeDeepeningSearch();
@@ -284,7 +288,9 @@ public class Searcher
 
 	public void EndSearch()
 	{
+		searchInitSemaphore.Wait();
 		searchCancelled = true;
+		searchInitSemaphore.Release();
 	}
 
 

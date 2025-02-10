@@ -39,6 +39,7 @@ public class Bot
 	private Move lastMove = Move.NullMove;
 	private int thinkTimeAfterPonder;
 	private string boardPositionForPondering;
+	private readonly Lock searcherLock = new();
 
 	public Bot(int hashSize, bool canPonder)
 	{
@@ -55,7 +56,7 @@ public class Bot
 
 	public void NotifyNewGame()
 	{
-		searcher.ClearForNewPosition();
+		lock(searcherLock) searcher.ClearForNewPosition();
 	}
 
 	public void SetPosition(string fen)
@@ -133,12 +134,15 @@ public class Bot
 
 	private void StartSearch(int timeMs)
 	{
-		searcher.IsPondering = IsPondering;
-		currentSearchID++;
-		searchWaitHandle.Set();
-		cancelSearchTimer?.Dispose();
-		cancelSearchTimer = new();
-		Task.Delay(timeMs, cancelSearchTimer.Token).ContinueWith((t) => EndSearch(currentSearchID));
+		lock (searcherLock)
+		{
+			searcher.IsPondering = IsPondering;
+			currentSearchID++;
+			searchWaitHandle.Set();
+			cancelSearchTimer?.Dispose();
+			cancelSearchTimer = new();
+			Task.Delay(timeMs, cancelSearchTimer.Token).ContinueWith((t) => EndSearch(currentSearchID));
+		}
 	}
 
 	private void SearchThread()
@@ -153,8 +157,6 @@ public class Bot
 	public void StopThinking(bool isPonderhit)
 	{
 		IsPonderHit = isPonderhit;
-		if (!isPonderhit)
-			IsPondering = false;
 		EndSearch();
 	}
 
@@ -171,7 +173,7 @@ public class Bot
 		cancelSearchTimer?.Cancel();
 		if (IsThinking)
 		{
-			searcher.EndSearch();
+			lock(searcherLock) searcher.EndSearch();
 		}
 		searcher.searchSemaphore.Wait();
 		searcher.searchSemaphore.Release();

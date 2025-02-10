@@ -48,44 +48,68 @@ parse:
 				Respond("uciok");
 				return "uci";
 			case "isready":
-				CreateEngineIfNeeded();
-				Respond("readyok");
-				return "isready";
+				lock (EngineLock)
+				{
+					CreateEngineIfNeeded();
+					Respond("readyok");
+					return "isready";
+				}
 			case "ucinewgame":
-				CreateEngineIfNeeded();
-				engine!.NotifyNewGame();
-				return "ucinewgame";
+				lock (EngineLock)
+				{
+					CreateEngineIfNeeded();
+					engine!.NotifyNewGame();
+					return "ucinewgame";
+				}
 			case "position":
-				CreateEngineIfNeeded();
-				ProcessPositionCommand(message);
-				return "position";
+				lock (EngineLock)
+				{
+					CreateEngineIfNeeded();
+					ProcessPositionCommand(message);
+					return "position";
+				}
 			case "go":
-				CreateEngineIfNeeded();
-				ProcessGoCommand(message);
-				return "go";
+				lock (EngineLock)
+				{
+					CreateEngineIfNeeded();
+					ProcessGoCommand(message);
+					return "go";
+				}
 			case "ponderhit":
-				if (engine is { IsThinking: true })
-					engine.StopThinking(true);
-				engine!.PonderHit();
-				return "ponderhit";
+				lock (EngineLock)
+				{
+					if (engine is { IsThinking: true })
+						engine.StopThinking(true);
+					engine!.PonderHit();
+					return "ponderhit";
+				}
 			case "stop":
-				if (engine is {IsThinking: true})
+				lock (EngineLock)
 				{
-					engine.StopThinking(false);
+					if (engine is { IsThinking: true })
+					{
+						engine.StopThinking(false);
+					}
+					return "stop";
 				}
-				return "stop";
 			case "quit":
-				engine?.Quit();
-				return "quit";
-			case "d":
-				if (engine is null)
-					Respond("info string Engine is not created yet");
-				else
+				lock (EngineLock)
 				{
-					//Console.WriteLine(engine.GetBoardDiagram());
-					Respond($"info string Pondering={engine.IsPondering}, thinking={engine.IsThinking}");
+					engine?.Quit();
+					return "quit";
 				}
-				return "d";
+			case "d":
+				lock (EngineLock)
+				{
+					if (engine is null)
+						Respond("info string Engine is not created yet");
+					else
+					{
+						//Console.WriteLine(engine.GetBoardDiagram());
+						Respond($"info string Pondering={engine.IsPondering}, thinking={engine.IsThinking}");
+					}
+					return "d";
+				}
 			case "setoption":
 				var (name, value) = GetOptionValue(messageParts[1..]);
 				if (options.ContainsKey(name))
@@ -113,22 +137,19 @@ parse:
 		if (engine is not null)
 			return;
 
-		lock (EngineLock)
-		{
-			if (engine is not null)
-				return;
+		if (engine is not null)
+			return;
 			
-			if (!options.TryGetValue(Options.HashSize, out var hashSizeStr)
-			    || !int.TryParse(hashSizeStr, out var hashSize)
-			    || hashSize < 1 || hashSize > Searcher.MaxTranspositionTableSizeMB)
-				hashSize = Searcher.DefaultTranspositionTableSizeMB;
-			if (!options.TryGetValue(Options.Ponder, out var ponderStr)
-			    || !bool.TryParse(ponderStr, out var canPonder))
-				canPonder = false;
-			engine = new(hashSize, canPonder);
-			engine.OnMoveChosen += OnMoveChosen;
-			engine.OnInfo += s => Respond("info " + s);
-		}
+		if (!options.TryGetValue(Options.HashSize, out var hashSizeStr)
+		    || !int.TryParse(hashSizeStr, out var hashSize)
+		    || hashSize < 1 || hashSize > Searcher.MaxTranspositionTableSizeMB)
+			hashSize = Searcher.DefaultTranspositionTableSizeMB;
+		if (!options.TryGetValue(Options.Ponder, out var ponderStr)
+		    || !bool.TryParse(ponderStr, out var canPonder))
+			canPonder = false;
+		engine = new(hashSize, canPonder);
+		engine.OnMoveChosen += OnMoveChosen;
+		engine.OnInfo += s => Respond("info " + s);
 	}
 
 	private static (string name, string value) GetOptionValue(ReadOnlySpan<string> messageParts)

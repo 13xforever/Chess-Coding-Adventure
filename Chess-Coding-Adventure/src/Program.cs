@@ -10,9 +10,17 @@ public static class Program
         var command = "";
         while (command != "quit")
         {
-            command = Console.ReadLine();
-            if (!string.IsNullOrEmpty(command))
-                command = engine.ReceiveCommand(command);
+            try
+            {
+                command = Console.ReadLine();
+                if (!string.IsNullOrEmpty(command))
+                    command = engine.ReceiveCommand(command);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                return;
+            }
         }
     }
 }
