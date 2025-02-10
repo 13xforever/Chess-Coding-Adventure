@@ -12,7 +12,7 @@ public class Searcher
 {
 	// Constants
 	public const int DefaultTranspositionTableSizeMB = 256;
-	public static readonly int MaxTranspositionTableSizeMB = Array.MaxLength / 1024 / 1024;
+	public static readonly int MaxTranspositionTableSizeMB = (int)Min((long)Array.MaxLength * TranspositionTable.TtEntrySizeBytes / 1024 / 1024, int.MaxValue);
 	private readonly int transpositionTableSizeMB;
 	private readonly bool canPonder;
 	private const int maxExtentions = 16;

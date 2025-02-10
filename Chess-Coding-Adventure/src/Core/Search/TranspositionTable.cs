@@ -29,7 +29,7 @@ public class TranspositionTable
 	public bool enabled = true;
 	private Board board;
 
-	private static readonly int ttEntrySizeBytes = Marshal.SizeOf<Entry>();
+	internal static readonly int TtEntrySizeBytes = Marshal.SizeOf<Entry>();
 	private readonly Lock setLocker = new();
 	private readonly HashSet<ulong> setEntries;
 	public int Hashfull
@@ -46,7 +46,7 @@ public class TranspositionTable
 		this.board = board;
 
 		var desiredTableSizeInBytes = sizeMB * 1024 * 1024;
-		var numEntries = desiredTableSizeInBytes / ttEntrySizeBytes;
+		var numEntries = desiredTableSizeInBytes / TtEntrySizeBytes;
 
 		count = numEntries;
 		entries = new Entry[numEntries];
